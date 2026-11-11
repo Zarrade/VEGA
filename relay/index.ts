@@ -96,17 +96,19 @@ const getHtml = async (url) => {
   const r = await fetch(url, { headers: { "User-Agent": BROWSER_UA, "Accept-Language": "en-US,en;q=0.9", "Accept": "text/html" } });
   return r.ok ? await r.text() : "";
 };
+const parseDdg = (html) => {
+  const out = [], re = /<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>([\s\S]*?)(?=<a[^>]*class="[^"]*result__a|$)/g; let m;
+  while ((m = re.exec(html)) && out.length < 8) {
+    const url = ddgUrl(m[1]); if (!url) continue;
+    const sn = m[3].match(/class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/(?:a|td|div)>/);
+    out.push({ title: decode(m[2]), url, snippet: sn ? decode(sn[1]) : "" });
+  }
+  return out;
+};
 const ENGINES = {
-  async ddg(q) {
-    const html = await getHtml("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q)), out = [];
-    const re = /<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>([\s\S]*?)(?=<a[^>]*class="[^"]*result__a|$)/g; let m;
-    while ((m = re.exec(html)) && out.length < 8) {
-      const url = ddgUrl(m[1]); if (!url) continue;
-      const sn = m[3].match(/class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/(?:a|td|div)>/);
-      out.push({ title: decode(m[2]), url, snippet: sn ? decode(sn[1]) : "" });
-    }
-    return out;
-  },
+  // the search engine answers the database's network but not the function's, so ask the database to fetch
+  async db(q) { return parseDdg(String((await db().rpc("vega_search_html", { q })) || "")); },
+  async ddg(q) { return parseDdg(await getHtml("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q))); },
   async lite(q) {
     const html = await getHtml("https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(q)), out = [];
     const re = /<a[^>]*href="([^"]+)"[^>]*class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>([\s\S]*?)(?=<a[^>]*class=['"]result-link|$)/g; let m;
@@ -117,34 +119,26 @@ const ENGINES = {
     }
     return out;
   },
-  async bing(q) {
-    const html = await getHtml("https://www.bing.com/search?setlang=en&mkt=en-US&q=" + encodeURIComponent(q)), out = [];
-    const re = /<li class="b_algo"[\s\S]*?<h2[^>]*><a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a><\/h2>([\s\S]*?)(?=<li class="b_algo"|$)/g; let m;
-    while ((m = re.exec(html)) && out.length < 8) {
-      let url = m[1].replace(/&amp;/g, "&");
-      const u = url.match(/[?&]u=a1([A-Za-z0-9_-]+)/);
-      if (u) { try { url = atob(u[1].replace(/-/g, "+").replace(/_/g, "/")); } catch { continue; } }
-      if (!/^https?:\/\//.test(url) || /bing\.com\/(ck|aclick)/.test(url)) continue;
-      const sn = m[3].match(/<p[^>]*>([\s\S]*?)<\/p>/);
-      out.push({ title: decode(m[2]), url, snippet: sn ? decode(sn[1]).replace(/^[^·]{0,24}·\s*/, "") : "" });
-    }
-    return out;
-  },
   async wiki(q) {
     const r = await fetch("https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=5&srsearch=" + encodeURIComponent(q), { headers: { "User-Agent": UA } });
     const j = await r.json();
     return (j.query?.search || []).map((p) => ({ title: p.title, url: "https://en.wikipedia.org/wiki/" + encodeURIComponent(p.title.replace(/ /g, "_")), snippet: decode(p.snippet || "") }));
   },
 };
-let lastEngine = "ddg";
+const STOP = /^(what|when|where|which|with|from|that|this|have|does|about|latest|news|today|into|your|their|there)$/;
+const relevant = (q, list) => {
+  const terms = (q.toLowerCase().match(/[a-z0-9À-￿]{4,}/g) || []).filter((t) => !STOP.test(t));
+  if (!terms.length) return list;
+  return list.filter((r) => terms.some((t) => (r.title + " " + r.snippet + " " + r.url).toLowerCase().includes(t)));
+};
+let lastEngine = "db";
 async function search(q) {
   const lead = /\b(news|latest|today|tonight|headlines?|breaking|this week|recent(ly)?|update[sd]?)\b/i.test(q) ? await news(q) : [];
-  // start with whichever engine answered last time, then the rest in order
-  const order = [lastEngine, ...["ddg", "bing", "lite", "wiki"].filter((e) => e !== lastEngine)];
+  const order = [lastEngine, ...["db", "ddg", "lite", "wiki"].filter((e) => e !== lastEngine)];
   for (const name of order) {
     try {
-      const got = await ENGINES[name](q);
-      if (got.length) { lastEngine = name; return { engine: name, results: [...lead, ...got].slice(0, 9) }; }
+      const got = relevant(q, await ENGINES[name](q));
+      if (got.length) { lastEngine = name === "wiki" ? lastEngine : name; return { engine: name, results: [...lead, ...got].slice(0, 9) }; }
     } catch { /* try the next engine */ }
   }
   return { engine: lead.length ? "news" : "none", results: lead };
@@ -204,6 +198,7 @@ const db = () => g.__vegaDb || {
   upsert: (t, rows, on) => rest("POST", t + "?on_conflict=" + on, rows, "resolution=merge-duplicates,return=minimal"),
   update: (t, query, patch) => rest("PATCH", t + "?" + query, patch, "return=minimal"),
   del: (t, query) => rest("DELETE", t + "?" + query, undefined, "return=minimal"),
+  rpc: (fn, args) => rest("POST", "rpc/" + fn, args),
 };
 
 let vapidCache = null, cronKey = null;
@@ -235,6 +230,50 @@ const validEndpoint = (e) => { try { const u = new URL(e); return u.protocol ===
 const textHash = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h); };
 const inbox = (device, item) => db().insert("vega_inbox", [{ device, title: item.title, body: item.body, tag: item.tag, data: item.data || {} }]);
 
+// A scheduled protocol runs here, unattended, with the snapshot of the deck the device last synced.
+const clip = (v, n) => String(v ?? "").slice(0, n);
+const listOf = (v, n, each) => (Array.isArray(v) ? v : []).slice(0, n).map((x) => clip(x, each));
+function cleanContext(c) {
+  c = c && typeof c === "object" ? c : {};
+  return { name: clip(c.name || "VEGA", 20), user: clip(c.user, 30), home: clip(c.home, 60), tz: clip(c.tz, 40),
+    tasks: listOf(c.tasks, 25, 160), notes: listOf(c.notes, 10, 200), memory: listOf(c.memory, 25, 200), timers: listOf(c.timers, 10, 80) };
+}
+async function weatherLine(place) {
+  try {
+    const gj = await (await fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + encodeURIComponent(place))).json();
+    const l = gj.results && gj.results[0]; if (!l) return "";
+    const f = await (await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + l.latitude + "&longitude=" + l.longitude + "&current=temperature_2m,apparent_temperature,wind_speed_10m,precipitation&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&timezone=auto")).json();
+    const c = f.current || {}, d = f.daily || {};
+    return l.name + ": " + c.temperature_2m + "°C now (feels " + c.apparent_temperature + "°C), wind " + c.wind_speed_10m + " km/h; today " + (d.temperature_2m_min || [])[0] + " to " + (d.temperature_2m_max || [])[0] + "°C, rain chance " + (d.precipitation_probability_max || [])[0] + "%.";
+  } catch { return ""; }
+}
+export async function runProtocolJob(job, ctx) {
+  const key = env("OPENROUTER_API_KEY"); if (!key) return null;
+  const c = cleanContext(ctx), steps = clip(job.payload && job.payload.steps, 1500); if (!steps) return null;
+  let when = new Date().toUTCString();
+  try { if (c.tz) when = new Date().toLocaleString("en-GB", { timeZone: c.tz, dateStyle: "full", timeStyle: "short" }); } catch { /* keep UTC */ }
+  const wx = c.home ? await weatherLine(c.home) : "";
+  const system = "You are " + c.name + ", the user's trusted right hand: precise, economical with words, quietly witty, never servile. " +
+    "You are running a scheduled protocol unattended; the user will read this as a notification and then in their deck. " +
+    "Write the finished result directly, in plain sentences, under 130 words. You cannot use tools here: work only from the context below and do not invent facts. " +
+    (c.user ? 'Address the user as "' + c.user + '" at most once.\n' : "\n") +
+    "\nCONTEXT\nNow: " + when + "\nWeather: " + (wx || "unknown") +
+    "\nOpen tasks: " + (c.tasks.join("; ") || "none") + "\nNotes: " + (c.notes.join("; ") || "none") +
+    "\nActive timers: " + (c.timers.join("; ") || "none") + "\nLong-term memory: " + (c.memory.join("; ") || "empty");
+  const pref = [/deepseek/, /llama/, /qwen/, /gemini|gemma/, /mistral/], rank = (m) => { const i = pref.findIndex((p) => p.test(m.id)); return i < 0 ? 9 : i; };
+  const models = [...(await freeModels()).data].sort((a, b) => rank(a) - rank(b) || (b.context_length || 0) - (a.context_length || 0)).slice(0, 3);
+  for (const m of models) {
+    try {
+      const r = await fetch(OR + "/chat/completions", { method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "X-Title": "VEGA" },
+        body: JSON.stringify({ model: m.id, max_tokens: 500, temperature: 0.6, messages: [{ role: "system", content: system }, { role: "user", content: 'Run the "' + job.label + '" protocol: ' + steps }] }) });
+      if (!r.ok) continue;
+      const j = await r.json(), text = String(j.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<<act[\s\S]*?>>/g, "").trim();
+      if (text.length > 12) return text.slice(0, 2400);
+    } catch { /* try the next model */ }
+  }
+  return null;
+}
+
 async function syncJobs(device, jobs) {
   const have = await db().get("vega_jobs", "device=eq." + q(device) + "&select=id,kind,payload,hash");
   const clean = [];
@@ -242,7 +281,7 @@ async function syncJobs(device, jobs) {
     const label = String(j.label || "").slice(0, 80);
     if (j.kind === "timer" || j.kind === "protocol") {
       const at = +j.at; if (!(at > Date.now() - 6e4) || at > Date.now() + 366 * 864e5) continue;
-      clean.push({ device, kind: j.kind, label, payload: { tag: String(j.tag || "").slice(0, 40) }, next_at: new Date(at).toISOString(), every_min: j.kind === "protocol" ? 1440 : null, hash: null });
+      clean.push({ device, kind: j.kind, label, payload: { tag: String(j.tag || "").slice(0, 40), ...(j.kind === "protocol" ? { steps: clip(j.steps, 1500) } : {}) }, next_at: new Date(at).toISOString(), every_min: j.kind === "protocol" ? 1440 : null, hash: null });
     } else if (j.kind === "watch") {
       const u = publicUrl(String(j.url || "")); if (!u) continue;
       const every = Math.max(5, Math.min(1440, Math.round(+j.every || 30)));
@@ -267,9 +306,13 @@ export async function runCron() {
         await inbox(j.device, { title: "VEGA · timer", body: "Timer complete: " + j.label, tag: (j.payload && j.payload.tag) || "t" + j.id, data: { kind: "timer" } });
         await db().del("vega_jobs", "id=eq." + j.id); notify.add(j.device);
       } else if (j.kind === "protocol") {
-        await inbox(j.device, { title: "VEGA · " + j.label + " protocol", body: "Scheduled for now. Open VEGA to run it.", tag: "p-" + j.label, data: { kind: "protocol", run: j.label } });
         let next = Date.parse(j.next_at); while (next <= now) next += 864e5;
-        await db().update("vega_jobs", "id=eq." + j.id, { next_at: new Date(next).toISOString() }); notify.add(j.device);
+        await db().update("vega_jobs", "id=eq." + j.id, { next_at: new Date(next).toISOString() });
+        let text = null;
+        try { const dev = (await db().get("vega_devices", "id=eq." + q(j.device) + "&select=context"))[0]; text = await runProtocolJob(j, dev && dev.context); } catch { /* fall back to a prompt to run it */ }
+        if (text) await inbox(j.device, { title: "VEGA · " + j.label, body: text.replace(/[*_#`]/g, "").slice(0, 240), tag: "p-" + j.label, data: { kind: "report", label: j.label, text } });
+        else await inbox(j.device, { title: "VEGA · " + j.label + " protocol", body: "Scheduled for now. Open VEGA to run it.", tag: "p-" + j.label, data: { kind: "protocol", run: j.label } });
+        notify.add(j.device);
       } else if (j.kind === "watch") {
         let h = null;
         try { h = textHash((await read(j.payload.url)).text.replace(/\d{1,2}:\d{2}(:\d{2})?/g, "")); } catch { /* unreachable this round */ }
@@ -313,7 +356,11 @@ async function background(req, path, url, origin) {
   if (path.endsWith("/push/unregister")) { await db().del("vega_devices", "id=eq." + q(device)); return json({ ok: true }, 200, origin); }
   if (path.endsWith("/jobs/sync")) {
     if (!(await db().get("vega_devices", "id=eq." + q(device) + "&select=id")).length) return fail("This device is not registered for background alerts.", 404, origin);
-    try { return json({ ok: true, jobs: await syncJobs(device, body.jobs) }, 200, origin); } catch (e) { return fail(e.message || "The jobs could not be saved.", 400, origin); }
+    try {
+      const n = await syncJobs(device, body.jobs);
+      if (body.context) await db().update("vega_devices", "id=eq." + q(device), { context: cleanContext(body.context) });
+      return json({ ok: true, jobs: n }, 200, origin);
+    } catch (e) { return fail(e.message || "The jobs could not be saved.", 400, origin); }
   }
   return null;
 }

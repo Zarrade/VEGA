@@ -330,12 +330,12 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
       <div class="row">
         <button type="button" class="tb" id="mic" title="Talk: click, or hold Space when not typing" aria-label="Talk"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
         <textarea id="inp" rows="1" placeholder="Speak or type. / for commands." autocomplete="off"></textarea>
-        <button type="button" class="tb" id="att" title="Attach an image or a text file" aria-label="Attach an image or a text file"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.3"/></svg></button>
+        <button type="button" class="tb" id="att" title="Attach an image, a text file or a PDF" aria-label="Attach an image, a text file or a PDF"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.3"/></svg></button>
         <button type="button" class="tb" id="bcam" title="Camera" aria-label="Camera"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
         <button class="tb" id="go" title="Send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
       <div class="hint"><span><kbd>Enter</kbd> send</span><span><kbd>Shift Enter</kbd> new line</span><span><kbd>/</kbd> commands</span><span><kbd>Ctrl K</kbd> palette</span><span><kbd>Esc</kbd> stop</span></div>
-      <input type="file" id="file" accept="image/*,text/*,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xml,.html,.css,.js,.ts,.py,.yml,.yaml,.sql,.sh" multiple hidden>
+      <input type="file" id="file" accept="image/*,text/*,application/pdf,.pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xml,.html,.css,.js,.ts,.py,.yml,.yaml,.sql,.sh" multiple hidden>
     </form>
   </main>
 
@@ -350,7 +350,7 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
     <section class="card"><h3>Memory <small id="n-mm"></small></h3><ul class="list" id="memory"></ul>
       <form class="add" data-add="remember"><input id="a-mm" placeholder="+ a fact to always remember" aria-label="Add memory"></form></section>
     <section class="card"><h3>Library <small id="n-dc"></small></h3><ul class="list" id="docs"></ul>
-      <button class="btn" id="adddoc" type="button">+ Add text files</button></section>
+      <button class="btn" id="adddoc" type="button">+ Add files (text, PDF)</button></section>
     <section class="card"><h3>Sentries <small id="n-wt"></small></h3><ul class="list" id="watches"></ul></section>
   </aside>
 </div>
@@ -399,7 +399,7 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
     <div id="app-l"><h3>Desktop app</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="instbtn" type="button">Install as an app</button><button class="btn" id="bgbtn" type="button">Turn on background alerts</button></div>
       <p class="note" id="bgst"></p>
-      <p class="note">Installed, VEGA opens in its own window from your desktop, dock or taskbar. With background alerts on, your relay keeps your timers, sentries and protocol schedules and notifies this device when one is due, even when VEGA is closed. A scheduled protocol runs when you open its notification.</p>
+      <p class="note">Installed, VEGA opens in its own window from your desktop, dock or taskbar. With background alerts on, your relay keeps your timers, sentries and protocol schedules and notifies this device when one is due, even when VEGA is closed. A scheduled protocol is run by the relay itself, from a snapshot of your tasks, notes and memory that this device syncs to it, and the result arrives as the notification.</p>
     </div>
     <h3>Data</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="exp" type="button">Export</button><button class="btn" id="clr" type="button">Clear conversation</button><button class="btn" id="wipe" type="button">Erase everything</button></div>
@@ -460,6 +460,7 @@ const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({...S,history:S.hist
 if(VD.relay&&!S.relay)S.relay=VD.relay;
 if(VD.relay&&VD.url&&!S.key&&/openrouter\.ai/i.test(S.url)){S.url=VD.url;S.model=''}
 const busyM={};
+let visionSet=new Set();
 let epoch=0,lastImgs=[],booted=false,inMission=false,pendingMission=null,online=false,models=[],priced=false,freeSet=new Set(),ctxMap={},busy=false,ctl=null,pending=[],sessTok=0,lats=[],boot=Date.now(),capsDone=!HOSTED;
 const log=$('#log'),inp=$('#inp');
 const dial=(id,f)=>{const c=document.querySelector('#'+id+' .v');if(c)c.style.strokeDasharray=(150.8*Math.max(0,Math.min(1,f||0)))+' 201.1'};
@@ -505,7 +506,7 @@ async function probe(){
     if(!r.ok)throw new Error(r.status);
     const j=await r.json();let list=(j.data||j.models||[]).filter(m=>m&&(m.id||m.name));
     const isFree=m=>/:free$/.test(m.id||'')||(m.pricing&&+m.pricing.prompt===0&&+m.pricing.completion===0);
-    priced=list.some(m=>m.pricing);freeSet=new Set(list.filter(isFree).map(m=>m.id));ctxMap={};list.forEach(m=>{if(m.context_length)ctxMap[m.id||m.name]=m.context_length});
+    priced=list.some(m=>m.pricing);freeSet=new Set(list.filter(isFree).map(m=>m.id));ctxMap={};list.forEach(m=>{if(m.context_length)ctxMap[m.id||m.name]=m.context_length});visionSet=new Set(list.filter(m=>m.architecture&&(m.architecture.input_modalities||[]).includes('image')&&(!priced||!S.freeOnly||isFree(m))).map(m=>m.id||m.name));
     if(priced&&S.freeOnly){const pref=[/deepseek/,/llama/,/qwen/,/gemini|gemma/,/mistral/],rank=m=>{const i=pref.findIndex(p=>p.test(m.id));return i<0?9:i};
       list=list.filter(isFree).filter(m=>!m.architecture||!m.architecture.output_modalities||m.architecture.output_modalities.includes('text')).sort((a,b)=>rank(a)-rank(b)||(b.context_length||0)-(a.context_length||0))}
     models=list.map(m=>m.id||m.name);
@@ -529,6 +530,9 @@ function setLink(){
 async function chatEndpoint(messages,onText,signal){
   if(priced&&S.freeOnly&&!freeSet.has(S.model))throw new Error('"'+S.model+'" is not a free model. Pick a free one in Settings.');
   const order=[S.model,...models.filter(m=>m!==S.model&&(!priced||!S.freeOnly||freeSet.has(m)))].filter(m=>!(busyM[m]>Date.now())).slice(0,3);if(!order.length)order.push(S.model);
+  /* an image needs a model that can see: route to one automatically */
+  if(visionSet.size&&messages.some(m=>Array.isArray(m.content)&&m.content.some(c=>c.type==='image_url'))){const vo=[...order.filter(m=>visionSet.has(m)),...[...visionSet].filter(m=>!order.includes(m))].slice(0,3);
+    if(vo.length){if(vo[0]!==S.model)toast('Using '+vo[0].split('/').pop()+' to look at the image.');order.length=0;order.push(...vo)}}
   let r,used;
   for(let i=0;i<order.length;i++){used=order[i];
     r=await fetch(base()+'/chat/completions',{method:'POST',signal,headers:hdr(),body:JSON.stringify({model:used,messages,stream:true,temperature:+S.temp})});
@@ -663,8 +667,20 @@ function docChip(el,title){if(!el||!el.querySelector('.acts'))return;const b=doc
 function addFiles(files){[...files].forEach(f=>{
   if(f.type.startsWith('image/')){const r=new FileReader();r.onload=()=>addImage(r.result);r.readAsDataURL(f);return}
   if(f.size>2e6)return toast(f.name+' is too large for the Library (2 MB limit).');
-  if(/\.(pdf|docx?|xlsx?|pptx?|zip|png|jpe?g|gif|mp[34]|wav)$/i.test(f.name))return toast(f.name+': only text files can be read here (txt, md, csv, json, code).');
+  if(/\.pdf$/i.test(f.name)||f.type==='application/pdf')return readPdf(f);
+  if(/\.(docx?|xlsx?|pptx?|zip|png|jpe?g|gif|mp[34]|wav)$/i.test(f.name))return toast(f.name+': only text files and PDFs can be read here.');
   const r=new FileReader();r.onload=()=>{if(/\u0000/.test(String(r.result).slice(0,2000)))return toast(f.name+' is not a text file.');addDoc(f.name,r.result,'upload');toast('Added to the Library: '+f.name)};r.readAsText(f)})}
+let pdfLib=null;
+function loadPdfLib(){if(pdfLib)return pdfLib;const base='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  return pdfLib=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src=base+'pdf.min.js';sc.onload=()=>{try{const L=window.pdfjsLib;L.GlobalWorkerOptions.workerSrc=base+'pdf.worker.min.js';res(L)}catch(e){rej(e)}};sc.onerror=()=>{pdfLib=null;rej(new Error('the PDF reader could not be loaded'))};document.head.append(sc)})}
+async function readPdf(f){if(f.size>25e6)return toast(f.name+' is too large (25 MB limit).');toast('Reading '+f.name+'…');
+  try{const L=await loadPdfLib(),doc=await L.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise,n=Math.min(doc.numPages,300);let out='';
+    for(let i=1;i<=n&&out.length<400000;i++){const pg=await doc.getPage(i),tc=await pg.getTextContent();let line='',lastY=null;
+      for(const it of tc.items){const y=it.transform?Math.round(it.transform[5]):null;if(lastY!==null&&y!==null&&Math.abs(y-lastY)>2)line+='\n';else if(line&&!/\s$/.test(line)&&it.str&&!/^\s/.test(it.str))line+=' ';line+=it.str;lastY=y}
+      out+=(n>1?'\n\n[Page '+i+']\n':'')+line.replace(/[ \t]+\n/g,'\n').replace(/[ \t]{2,}/g,' ')}
+    if(out.replace(/\[Page \d+\]|\s/g,'').length<20)return toast(f.name+' has no readable text. It may be a scan.');
+    addDoc(f.name,out.trim(),'upload');toast('Added to the Library: '+f.name+' ('+n+(doc.numPages>n?' of '+doc.numPages:'')+' pages)')}
+  catch(e){toast(f.name+' could not be read: '+(e&&e.message||'unknown reason')+'.')}}
 function notify(body,tag){try{if(!HOSTED&&'Notification'in window&&Notification.permission==='granted')new Notification(S.name,{body,tag,icon:'icon-192.png'})}catch(e){}}
 function askNotify(){try{if(!HOSTED&&'Notification'in window&&Notification.permission==='default'){const p=Notification.requestPermission();p&&p.catch&&p.catch(()=>{})}}catch(e){}}
 
@@ -828,7 +844,7 @@ function slash(t){
     default:return false}
   inp.value='';grow();return true}
 function help(){const web=relayOK()?'- **Search the web and read pages** for current facts, and cite where they came from.\n':'',facts=webOK()?'- Look things up in the **encyclopedia** and check the **weather** anywhere.\n':'';
-  addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space when not typing)':''}, and read replies aloud.\n${web}${facts}- **Calculate exactly** and **run code** in a sandbox for analysis and simulations.\n- Keep a **Library**: add text files and I can read and search them; long work I produce is saved there for you to copy or download.\n- Run **timers and clock-time reminders**, keep **tasks and notes**, and **remember** facts about you between sessions.\n- Look at **images** you attach or paste${HOSTED?'':', or at your screen (say \`look at my screen\`)'}.\n- Put **charts, tables and weather panels** on screen.\n- Run **protocols**: routines you name and trigger with \`run the morning protocol\`, optionally on a daily schedule.\n${relayOK()?'- Post **sentries** on web pages and tell you when they change.\n':''}${convoOK()?'- Hold a hands-free **conversation**: say \`conversation mode\`, and \`that will be all\` to end.\n':''}- **Speak up** on my own: an arrival briefing, low power, lost connection.\n${HOSTED?'':'- Install as a **desktop app** and keep alerting you in the background (Settings → Desktop app).\n'}- Take a big objective, plan it, and work it step by step with my tools. I start a mission myself when a request calls for one, or use \`/mission your objective\`.\n\nI choose my approach for each request; the label at the top shows which.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/mission objective\` · \`/clear\` · \`/export\`\n\n${HOSTED?'In this hosted view I cannot reach the internet. ':relayOK()?'':'Web search needs a relay address in Settings. '}I cannot control other apps or devices.`)}
+  addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space when not typing)':''}, and read replies aloud.\n${web}${facts}- **Calculate exactly** and **run code** in a sandbox for analysis and simulations.\n- Keep a **Library**: add text files or PDFs and I can read and search them; long work I produce is saved there for you to copy or download.\n- Run **timers and clock-time reminders**, keep **tasks and notes**, and **remember** facts about you between sessions.\n- Look at **images** you attach or paste${HOSTED?'':', or at your screen (say \`look at my screen\`)'}.\n- Put **charts, tables and weather panels** on screen.\n- Run **protocols**: routines you name and trigger with \`run the morning protocol\`, optionally on a daily schedule.\n${relayOK()?'- Post **sentries** on web pages and tell you when they change.\n':''}${convoOK()?'- Hold a hands-free **conversation**: say \`conversation mode\`, and \`that will be all\` to end.\n':''}- **Speak up** on my own: an arrival briefing, low power, lost connection.\n${HOSTED?'':'- Install as a **desktop app** and keep alerting you in the background (Settings → Desktop app).\n'}- Take a big objective, plan it, and work it step by step with my tools. I start a mission myself when a request calls for one, or use \`/mission your objective\`.\n\nI choose my approach for each request; the label at the top shows which.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/mission objective\` · \`/clear\` · \`/export\`\n\n${HOSTED?'In this hosted view I cannot reach the internet. ':relayOK()?'':'Web search needs a relay address in Settings. '}I cannot control other apps or devices.`)}
 function clearChat(){epoch++;stop();pendingMission=null;S.history=[];save();log.innerHTML='';home();stats();hello()}
 async function exportData(){const data=JSON.stringify({...S,key:undefined,library:DOCS},null,2),fn=S.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-export.json';
   if(CAP.dl){try{await CAP.dl.save({filename:fn,data});toast('Export saved.')}catch(e){if(!e||e.code!=='declined')toast('The export could not be saved here.')}return}
@@ -886,7 +902,7 @@ function stats(){
   $('#h-up').textContent=dur((Date.now()-boot)/1000);
   $('#s-tts').textContent=!S.speak?'muted':CAP.tts?'Claude voice':hasSynth?'system voice':'text only';
   $('#s-stt').textContent=CAP.dict?'dictation':HOSTED?'typing only':S.stt==='local'?'local whisper':SR?'browser':'typing only';
-  $('#s-vis').textContent=engine()==='claude'?(CAP.img?'images':'off'):'images + camera';
+  $('#s-vis').textContent=engine()==='claude'?(CAP.img?'images':'off'):priced&&!visionSet.size?'no free vision model now':'images · camera · screen';
   $('#s-web').textContent=HOSTED?'not in this view':!webOK()?'off':S.relay?'search · pages · facts':'facts · weather';$('#s-code').textContent='sandbox · calculator';
   $('#s-wake').textContent=!S.wake||!SR?'off':wakeRec?'armed · say "'+S.name+'"':wakeNeed?'click once to arm':'starting';
   $('#mic').hidden=!micOK();$('#bcam').hidden=HOSTED;$('#att').hidden=HOSTED&&capsDone&&!CAP.img}
@@ -1188,7 +1204,7 @@ function sentinel(){
     const lastUser=[...S.history].reverse().find(m=>m.role==='user');
     const hrs=Math.floor((Date.now()-boot)/72e5);if(hrs>flag.long&&lastUser&&Date.now()-lastUser.t<6e5){flag.long=hrs;announce(`That is ${hrs*2} hours straight${hon()}. A short break tends to improve the work.`,'Wellbeing',{sound:false})}}
   const d=new Date(),hm2=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-  for(const p of S.protocols)if(p.at===hm2&&p.ran!==today()&&!busy&&engine()){p.ran=today();save();runProtocol(p,true);break}
+  if(!S.bg)for(const p of S.protocols)if(p.at===hm2&&p.ran!==today()&&!busy&&engine()){p.ran=today();save();runProtocol(p,true);break}
   patrol();homeWeather()}
 addEventListener('offline',()=>{if(S.proactive!==false&&!flag.off){flag.off=true;announce('We have lost the network connection. Timers, the Library and calculations still work.','Network')}stats()});
 addEventListener('online',()=>{if(flag.off){flag.off=false;if(S.proactive!==false)announce('Connection restored.','Network',{sound:false})}stats();if(!HOSTED)probe()});
@@ -1294,10 +1310,13 @@ function nextAt(hm){const[h,m]=String(hm).split(':').map(Number),d=new Date();d.
 function syncJobs(force){try{if(HOSTED||!S.bg||!S.device||!S.relay)return;clearTimeout(jobT);jobT=setTimeout(async()=>{
   const jobs=[...S.timers.filter(t=>!t.fired&&t.end>Date.now()).map(t=>({kind:'timer',label:t.label,at:Math.round(t.end),tag:'t'+Math.round(t.end)})),
     ...(S.watches||[]).map(w=>({kind:'watch',label:w.label,url:w.url,every:w.every})),
-    ...(S.protocols||[]).filter(p=>p.at).map(p=>({kind:'protocol',label:p.name,at:nextAt(p.at),hm:p.at}))];
-  const sig=JSON.stringify(jobs.map(j=>[j.kind,j.label,j.url||'',j.kind==='protocol'?j.hm:j.at,j.every||'']));if(sig===jobSig&&!force)return;
-  try{await postJSON(rbase()+'/jobs/sync',{device:S.device,jobs});jobSig=sig}catch(e){if(/not registered/.test(e.message)){S.bg=false;save();bgUI()}}},force?200:2500)}catch(e){}}
+    ...(S.protocols||[]).filter(p=>p.at).map(p=>({kind:'protocol',label:p.name,at:nextAt(p.at),hm:p.at,steps:p.steps}))];
+  let tz='';try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch(e){}
+  const context={name:S.name,user:S.user,home:S.home,tz,tasks:S.tasks.filter(t=>!t.done).map(t=>t.text),notes:S.notes.slice(-10).map(n=>n.text),memory:S.memory.map(m=>m.text),timers:S.timers.filter(t=>!t.fired).map(t=>t.label)};
+  const sig=JSON.stringify([jobs.map(j=>[j.kind,j.label,j.url||'',j.kind==='protocol'?j.hm+j.steps:j.at,j.every||'']),jobs.some(j=>j.kind==='protocol')?context:0]);if(sig===jobSig&&!force)return;
+  try{await postJSON(rbase()+'/jobs/sync',{device:S.device,jobs,context});jobSig=sig}catch(e){if(/not registered/.test(e.message)){S.bg=false;save();bgUI()}}},force?200:2500)}catch(e){}}
 function handleItem(it,quiet){const d=(it&&it.data)||{};
+  if(d.kind==='report'&&d.text){const p=findProto(d.label);if(p){p.ran=today();save()}announce(String(d.text),(d.label||'Protocol')+' · ran in the background',{force:true,silent:!!quiet,sound:!quiet});return}
   if(d.kind==='watch')announce('**Sentry** · '+String(it.body||(d.label||'A watched page')+' has changed.'),'Sentry',{force:true,silent:!!quiet,sound:!quiet,chips:d.url?['Read '+d.url+' and tell me what is new']:undefined});
   else if(d.kind==='protocol'||d.run){const p=findProto(d.run);if(p&&p.ran!==today()&&!busy)Promise.resolve(ensureEngine()).then(ok=>{if(ok&&!busy&&p.ran!==today()){p.ran=today();save();runProtocol(p,true)}})}}
 async function pullInbox(){if(HOSTED||!S.bg||!S.device||!S.relay||!navigator.onLine)return;try{const j=await getJSON(rbase()+'/inbox?device='+enc(S.device));(j.items||[]).forEach(i=>handleItem(i))}catch(e){}}
@@ -1315,6 +1334,7 @@ seedProtocols();S.convo=false;home();renderOps();renderDocs();renderPresence();s
 if(!HOSTED)probe().then(()=>{stats();armWake()});
 booted=true;if(innerWidth>1080)inp.focus();
 bootLines();arrival();setInterval(sentinel,30000);swInit();
-function runHash(){if(HOSTED||location.hash.indexOf('#run-')!==0)return;const rn=decodeURIComponent(location.hash.slice(5));try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}handleItem({data:{kind:'protocol',run:rn}})}
+function runHash(){if(HOSTED)return;const h=location.hash;if(!/^#(run-|talk$|mission$)/.test(h))return;try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+  if(h==='#talk')setTimeout(()=>listen(true),700);else if(h==='#mission'){inp.value='/mission ';inp.focus()}else handleItem({data:{kind:'protocol',run:decodeURIComponent(h.slice(5))}})}
 runHash();addEventListener('hashchange',runHash);
 </script>

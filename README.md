@@ -20,7 +20,7 @@ It also works with any OpenAI-style endpoint. For a fully private setup point it
   - **Web search and page reading** through the relay, with source links on the reply.
   - **Encyclopedia and weather** lookups.
   - **Exact calculation** and **sandboxed code** for analysis and simulations (no network or page access inside the sandbox).
-  - **Library**: drop in text files and VEGA can read and search them; long work it writes is saved there to copy or download.
+  - **Library**: drop in text files or PDFs and VEGA can read and search them; long work it writes is saved there to copy or download.
   - **Timers, clock-time reminders, tasks, notes and long-term memory.**
 - **Presence**: VEGA speaks as it thinks (sentence by sentence), answers simple commands instantly without a model call, and speaks up on its own: a daily arrival briefing, low power, a lost connection.
 - **Conversation mode**: hands-free back and forth. Say "conversation mode" to start and "that will be all" to end.
@@ -30,7 +30,8 @@ It also works with any OpenAI-style endpoint. For a fully private setup point it
 - **Screen awareness**: say "look at my screen" to share a capture with a vision-capable model.
 - **Resilience**: if a free model is busy, VEGA reroutes to another one on its own.
 - **Desktop app**: install it from the browser (Chrome or Edge: the install icon in the address bar, or Settings → Desktop app) and it opens in its own window and still starts offline.
-- **Background alerts**: turn them on in Settings and the relay keeps your timers, sentries and protocol schedules, notifying the device through web push even when VEGA is closed.
+- **Background alerts**: turn them on in Settings and the relay keeps your timers, sentries and protocol schedules, notifying the device through web push even when VEGA is closed. Scheduled protocols are run by the relay itself, from a snapshot of your tasks, notes and memory that the device syncs to it, and the result arrives as the notification.
+- **Vision routing**: when you attach an image, VEGA switches to a free model that can see, if one is available.
 - **Wake word**: say the assistant's name to wake it. It tolerates common mishearings and pauses while VEGA itself is speaking.
 - **Missions**: for a big objective VEGA plans it, works each step with its tools, delivers the result and files it in the Library. It starts one on its own, or use `/mission`.
 - **Voice**: hold Space to talk; replies can be read aloud. Optional wake word.
@@ -54,4 +55,4 @@ It also works with any OpenAI-style endpoint. For a fully private setup point it
 
 ## Limits
 
-Web search and page reading need the relay. Wikipedia and weather lookups go straight from your browser to those services, only when VEGA uses them; turn off "Allow web tools" in Settings to stop all of it. The Library reads text files only (no PDF or Office files). VEGA cannot control other apps or devices.
+Web search and page reading need the relay. Wikipedia and weather lookups go straight from your browser to those services, only when VEGA uses them; turn off "Allow web tools" in Settings to stop all of it. The Library reads text files and PDFs (not scans or Office files); the PDF reader is fetched from a public CDN the first time you add a PDF. VEGA cannot control other apps or devices.
