@@ -8,7 +8,12 @@ A small server-side proxy so the public VEGA page never contains an API key.
 - `GET  /read?url=` — the readable text of a public web page. Private and local addresses are refused, including through redirects.
 - `GET  /health`
 - `GET  /push/key`, `POST /push/register`, `POST /push/unregister`, `POST /jobs/sync`, `GET /inbox` — the background service: a device registers a browser push subscription and syncs its timers, sentries and protocol schedules.
+- `GET /state`, `POST /state` — sync across devices: one encrypted blob per sync id with a revision counter; a stale write is refused and returns the current blob. Needs the `vega_sync` table (row level security on, no policies).
 - `POST /cron` — called every minute by the database scheduler with a secret header. Due jobs become inbox items and the device gets an empty push, on which its service worker fetches the inbox.
+
+## Better search
+
+Set the secret `BRAVE_API_KEY` or `TAVILY_API_KEY` and the relay uses that search API first, falling back to its built-in sources.
 
 ## Guard rails
 
@@ -21,6 +26,8 @@ A small server-side proxy so the public VEGA page never contains an API key.
 It needs four tables (`vega_config`, `vega_devices`, `vega_jobs`, `vega_inbox`, all with row level security on and no policies, so only the relay's service role can touch them), the `pg_cron` and `pg_net` extensions, and a `pg_cron` job that posts to `/cron` every minute with the `x-cron-key` stored in `vega_config`. The relay creates its own web push signing keys on first use and stores them in `vega_config`. Push notifications carry no content; the text is fetched from the inbox by the device.
 
 ## Deploy on Supabase
+
+The deployed function is a one-line loader that imports `relay/index.ts` from this repository at one exact commit, so what runs is what is reviewed here. To update the relay, push, then redeploy the loader with the new commit id.
 
 1. Deploy `index.ts` as an Edge Function named `vega-relay` with JWT verification **off** (the page is public and has no login).
 2. Add the secret `OPENROUTER_API_KEY` in the Supabase dashboard under Edge Functions → Secrets.

@@ -64,7 +64,7 @@ button{cursor:pointer;background:none;border:0;padding:0}
 #clock{font:500 13px var(--mono);letter-spacing:.08em;font-variant-numeric:tabular-nums}
 .ib{width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--edge2);background:var(--glass);color:var(--dim);flex:none;transition:.2s}
 .ib svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.ib:hover{color:var(--acc);border-color:var(--acc);box-shadow:0 0 14px rgba(var(--accrgb),.3)}
+.ib:hover,.ib.on{color:var(--acc);border-color:var(--acc);box-shadow:0 0 14px rgba(var(--accrgb),.3)}
 .only-narrow{display:none}
 
 /* ---- rails and cards ---- */
@@ -274,7 +274,19 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
 }
 @media (max-width:900px){#clock,#stance span{display:none}}
 @media (pointer:coarse){.ib{width:40px;height:40px}.mb{padding:9px 12px}.x{padding:10px 8px;margin:-8px -6px}.cb{width:20px;height:20px}.steps summary{padding:8px 0}.chip{height:40px;min-width:40px;justify-content:center}}
-@media (max-width:640px){#clock,.chip span,.glyph,#bthr{display:none}#stn{font-size:0;letter-spacing:.12em}#stn::after{content:attr(data-s);font-size:12px}body:not(.home) #stage{height:116px}body:not(.home) #state{padding-bottom:4px}#sugg{display:grid;grid-template-columns:1fr 1fr}.sg{padding:12px 8px;letter-spacing:.1em}.chip{padding:0 9px}.f{grid-template-columns:1fr;gap:4px}.tr{gap:8px}.brand b{font-size:15px;letter-spacing:.3em}#stance span{display:none}.msg.user{max-width:88%}}
+@media (max-width:640px){#clock,.chip span,.glyph,#bthr,#bmini{display:none}#stn{font-size:0;letter-spacing:.12em}#stn::after{content:attr(data-s);font-size:12px}body:not(.home) #stage{height:116px}body:not(.home) #state{padding-bottom:4px}#sugg{display:grid;grid-template-columns:1fr 1fr}.sg{padding:12px 8px;letter-spacing:.1em}.chip{padding:0 9px}.f{grid-template-columns:1fr;gap:4px}.tr{gap:8px}.brand b{font-size:15px;letter-spacing:.3em}#stance span{display:none}.msg.user{max-width:88%}}
+/* phones: no zoom-on-focus, keyboard-aware height, sheet-style dialogs, toast clear of the reply */
+@media (pointer:coarse){#inp,#pq,.add input,.f input:not([type=checkbox]):not([type=range]),.f select{font-size:16px}#app{height:var(--vvh,100%)}}
+@media (max-width:640px){
+  dialog:not(#pal){width:100vw;max-width:100vw;height:100%;max-height:100%;margin:0;border-left:0;border-right:0}
+  #pal{margin-top:calc(8px + env(safe-area-inset-top,0px))}
+  #toast{left:var(--gl);right:var(--gr);bottom:auto;top:calc(64px + env(safe-area-inset-top,0px));transform:translateY(-8px);max-width:none;text-align:center}
+  #toast.on{transform:none}
+  .pan{padding:10px 11px}.wx{gap:10px}.wxn b{font-size:38px}.wxd{margin-left:0;width:100%;justify-content:space-between}.wxd div{flex:1;min-width:0;padding:6px 4px}.wxd div:first-child{border-left:0}
+  .who{letter-spacing:.2em}.msg.ai{padding-left:14px}.row{gap:2px;padding:6px}
+  #hello{padding-bottom:18px}#hello p{margin-bottom:14px}
+  #ambt{font-size:clamp(52px,19vw,96px)}
+}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -288,6 +300,7 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
       <button class="chip wait" id="link" title="Engine settings"><span>Linking</span></button>
       <span id="clock"></span>
       <button class="ib" id="bthr" title="Conversations" aria-label="Conversations"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></button>
+      <button class="ib" id="bmini" title="Floating window" aria-label="Floating window" hidden><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><rect x="12" y="11" width="7" height="6" fill="currentColor" stroke="none"/></svg></button>
       <button class="ib" id="bpal" title="Command palette (Ctrl+K)" aria-label="Command palette"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
       <button class="ib" id="bset" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
       <button class="ib only-narrow" id="tgr" aria-label="Operations"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg></button>
@@ -399,8 +412,8 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
     <h3>Voice</h3>
     <div class="f"><label for="k-speak">Speak replies</label><input id="k-speak" data-k="speak" type="checkbox"></div>
     <div class="f"><label for="vsel">Voice</label><select data-k="voice" id="vsel"></select></div>
-    <div class="f" id="veng-l"><label for="k-veng">Voice engine</label><select id="k-veng" data-k="vengine"><option value="system">System voices</option><option value="neural">Neural voice, runs in this browser</option></select></div>
-    <p class="note" id="veng-n">The neural voice is a speech model that runs on your own device: about 90 MB is fetched once, then nothing you say or hear leaves the browser. It sounds far more natural than most system voices and needs a reasonably fast computer. In Edge, the system voices marked "natural" are also very good.</p>
+    <div class="f" id="vfixed"><span style="color:var(--dim);font:11px var(--mono)">Voice</span><span>Bella · generated in this browser</span></div>
+    <p class="note" id="veng-n">Bella is a speech model that runs on your own device: about 90 MB is fetched once, then nothing spoken leaves the browser. Until it has loaded, replies are text only.</p>
     <div class="f"><label for="k-rate">Pace</label><input id="k-rate" data-k="rate" type="range" min="0.7" max="1.5" step="0.05"></div>
     <div id="stt-l">
       <div class="f"><label for="k-stt">Speech recognition</label><select id="k-stt" data-k="stt"><option value="browser">Browser built-in</option><option value="local">Local Whisper endpoint</option></select></div>
@@ -408,6 +421,19 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
       <div class="f"><label for="k-sttm">Whisper model</label><input id="k-sttm" data-k="sttModel" spellcheck="false"></div>
       <div class="f"><label for="k-wake">Wake word</label><input id="k-wake" data-k="wake" type="checkbox"></div>
       <p class="note">The browser's built-in recognition (Chrome, Edge) sends audio to the browser vendor. For fully offline voice, choose the local Whisper endpoint (<code>/audio/transcriptions</code>). Wake word listens for the assistant's name.</p>
+    </div>
+    <div id="sync-l"><h3>Sync across devices</h3>
+      <div id="sync-off">
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="syncon" type="button">Turn on sync</button></div>
+        <div class="f" style="margin-top:12px"><label for="synccode">Or use a code</label><input id="synccode" placeholder="paste the code from your other device" autocomplete="off" spellcheck="false"></div>
+        <button class="btn" id="synclink" type="button">Link this device</button>
+      </div>
+      <div id="sync-on" hidden>
+        <div class="f"><label for="syncshow">Sync code</label><input id="syncshow" readonly spellcheck="false"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="synccopy" type="button">Copy code</button><button class="btn" id="syncgo" type="button">Sync now</button><button class="btn" id="syncoff" type="button">Turn off here</button></div>
+      </div>
+      <p class="note" id="syncst"></p>
+      <p class="note">Sync keeps tasks, notes, memory, protocols, sentries, timers, conversations and the Library the same on every device that has the code. It is encrypted in this browser with a key made from the code before it leaves; the relay stores only scrambled data. Anyone with the code can read it, so treat it like a password.</p>
     </div>
     <div id="app-l"><h3>Desktop app</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="instbtn" type="button">Install as an app</button><button class="btn" id="bgbtn" type="button">Turn on background alerts</button></div>
@@ -470,7 +496,8 @@ let S={...DEF,...VD};
 let hadSaved=false;try{const raw=localStorage.getItem(KEY);hadSaved=raw!==null;S={...S,...JSON.parse(raw||'{}')}}catch(e){}
 if(VD.key&&!S.key&&(!hadSaved||S.url===VD.url)){S.url=VD.url||S.url;S.key=VD.key;S.model=''}
 ['tasks','notes','memory','timers','history'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({...S,history:S.history.slice(-200)}))}catch(e){}syncJobs()};
+const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify({...S,history:S.history.slice(-200)}))}catch(e){}};
+const save=()=>{markHist();persist();syncJobs();syncSoon()};
 if(VD.relay&&!S.relay)S.relay=VD.relay;
 if(VD.relay&&VD.url&&!S.key&&/openrouter\.ai/i.test(S.url)){S.url=VD.url;S.model=''}
 const busyM={};
@@ -649,11 +676,11 @@ function act(a,el){
   const say=t=>el?chip(el,t):toast(t);const txt=String(a.text||a.fact||a.label||'').trim();let out='Nothing changed.';
   switch(a.tool){
     case'timer':{const s=Math.round(+a.seconds);if(!(s>0)){out='Invalid duration.';break}const lb=String(a.label||'timer').slice(0,60);S.timers.push({id:Date.now()+Math.random(),label:lb,end:Date.now()+s*1000,total:s});say(`TIMER · ${lb} · ${dur(s)}`);out=`Timer "${lb}" started for ${dur(s)}.`;break}
-    case'task':if(txt){S.tasks.push({text:txt,done:false});say('TASK + '+txt);out='Task added.'}break;
+    case'task':if(txt){S.tasks.push({text:txt,done:false,a:Date.now()});say('TASK + '+txt);out='Task added.'}break;
     case'done':{const t=txt&&S.tasks.find(t=>!t.done&&t.text.toLowerCase().includes(txt.toLowerCase()));if(t){t.done=true;say('DONE ✓ '+t.text);out=`Marked "${t.text}" done.`}else out='No open task matches that text.';break}
-    case'note':if(txt){S.notes.push({text:txt,t:Date.now()});say('NOTE + '+txt.slice(0,60));out='Note saved.'}break;
-    case'remember':if(txt){S.memory.push({text:txt});say('MEMORY + '+txt.slice(0,60));out='Stored in long-term memory.'}break;
-    case'forget':{const n=S.memory.length;S.memory=S.memory.filter(m=>!txt||!m.text.toLowerCase().includes(txt.toLowerCase()));if(S.memory.length<n){say('MEMORY − '+txt);out='Removed from memory.'}else out='No memory matches that text.';break}
+    case'note':if(txt){S.notes.push({text:txt,t:Date.now(),a:Date.now()});say('NOTE + '+txt.slice(0,60));out='Note saved.'}break;
+    case'remember':if(txt){S.memory.push({text:txt,a:Date.now()});say('MEMORY + '+txt.slice(0,60));out='Stored in long-term memory.'}break;
+    case'forget':{const n=S.memory.length;S.memory=S.memory.filter(m=>{const hit=txt&&m.text.toLowerCase().includes(txt.toLowerCase());if(hit)tombOf('memory',m);return!hit});if(S.memory.length<n){say('MEMORY − '+txt);out='Removed from memory.'}else out='No memory matches that text.';break}
     case'open':try{const u=new URL(a.url);if(/^https?:$/.test(u.protocol)&&el){chip(el,'OPEN ↗ '+u.host,u.href);out='A link button was shown to the user; they must click it.'}}catch(e){out='Invalid URL.'}break;
     case'mission':{const o=String(a.objective||a.text||'').trim();if(inMission)out='A mission is already running; finish this reply normally.';else if(o){pendingMission=o;say('MISSION ▸ '+o.slice(0,70));out='Mission queued and will start right after this reply. Tell the user in one short sentence that you are starting it. Do not do the work in this reply.'}break}
   }
@@ -680,7 +707,7 @@ let DOCS=[];try{DOCS=JSON.parse(localStorage.getItem(KEY+'.docs')||'[]')}catch(e
 if(!Array.isArray(DOCS))DOCS=[];
 function saveDocs(){try{localStorage.setItem(KEY+'.docs',JSON.stringify(DOCS));return true}catch(e){toast('The Library is full. Delete a document to make room.');return false}}
 function addDoc(title,text,src){title=String(title||'Untitled').replace(/\s+/g,' ').trim().slice(0,80)||'Untitled';text=String(text||'').slice(0,400000);
-  const i=DOCS.findIndex(d=>d.title.toLowerCase()===title.toLowerCase()),d={title,text,src,t:Date.now()};if(i>=0)DOCS[i]=d;else DOCS.push(d);saveDocs();renderDocs();return d}
+  const i=DOCS.findIndex(d=>d.title.toLowerCase()===title.toLowerCase()),d={title,text,src,t:Date.now()};if(i>=0)DOCS[i]=d;else DOCS.push(d);saveDocs();renderDocs();syncSoon();return d}
 const findDoc=t=>{t=String(t||'').toLowerCase().trim();return t?(DOCS.find(d=>d.title.toLowerCase()===t)||DOCS.find(d=>d.title.toLowerCase().includes(t))):null};
 function searchDocs(q){const terms=String(q).toLowerCase().match(/[a-z0-9À-￿]{3,}/g)||[],hits=[];
   for(const d of DOCS)for(let i=0;i<d.text.length;i+=700){const ch=d.text.slice(i,i+900),lc=ch.toLowerCase();let sc=0;for(const t of terms){let k=-1;while((k=lc.indexOf(t,k+1))>=0)sc++}if(sc)hits.push({sc,t:d.title,ch})}
@@ -782,14 +809,15 @@ async function agent(msgs,el,show,o={}){
     const dt=(performance.now()-t1)/1000;if(dt>.3){const v=Math.round(full.length/4/dt);$('#tps').textContent=v;dial('d-tps',v/150)}
     if(show){const t=join2(vis,clean(full));el._raw=t;setBody(el,t||'…');scroll();sayStream(t,false)}};
   if(cl){const r=await llm(msgs,on,ctl.signal,{tools:sampleTools(tl,el),imgs:o.imgs});sessTok+=Math.round(r.text.length/4);return{text:clean(r.text),truncated:r.truncated}}
-  let m=msgs;
+  let m=msgs;const seen=new Set();
   for(let round=0;round<5;round++){t1=0;
     const r=await llm(m,on,ctl.signal);sessTok+=Math.round(r.text.length/4);
     const raw=stripThink(r.text),calls=parseActs(raw);vis=join2(vis,clean(raw));if(show){el._raw=vis;setBody(el,vis||'…')}
     if(!calls.length)break;
     const out=[];let info=false;
     for(const c of calls.slice(0,4)){const t=tl.find(t=>t.id===c.tool||t.name===c.tool);let res;
-      if(!t)res='That tool is not available here.';else{try{res=await runTool(t,c,el)}catch(x){res='That did not work: '+(x&&x.message||x)}if(t.info)info=true}
+      const sigc=JSON.stringify(c);
+      if(!t)res='That tool is not available here.';else if(seen.has(sigc)){res='You already made this exact call and have its result above. Answer the user now.';if(t.info)info=true}else{seen.add(sigc);try{res=await runTool(t,c,el)}catch(x){res='That did not work: '+(x&&x.message||x)}if(t.info)info=true}
       out.push('['+c.tool+'] '+String(res).slice(0,7000));if(ctl.signal.aborted)throw{name:'AbortError'}}
     if(!info||round===4)break;
     m=[...m,{role:'assistant',content:raw||'(using tools)'},{role:'user',content:'[Tool results]\n'+out.join('\n\n')+'\n\nUse these results to answer the request. Call another tool only if it is essential. Do not repeat what you already said.'}]}
@@ -874,9 +902,9 @@ function slash(t){
     default:return false}
   inp.value='';grow();return true}
 function help(){const web=relayOK()?'- **Search the web and read pages** for current facts, and cite where they came from.\n':'',facts=webOK()?'- Look things up in the **encyclopedia** and check the **weather** anywhere.\n':'';
-  addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space when not typing)':''}, and read replies aloud.\n${web}${facts}- **Calculate exactly** and **run code** in a sandbox for analysis and simulations.\n- Keep a **Library**: add text files or PDFs and I can read and search them; long work I produce is saved there for you to copy or download.\n- Run **timers and clock-time reminders**, keep **tasks and notes**, and **remember** facts about you between sessions.\n- Look at **images** you attach or paste${HOSTED?'':', or at your screen (say \`look at my screen\`)'}.\n- Put **charts, tables and weather panels** on screen.\n- Run **protocols**: routines you name and trigger with \`run the morning protocol\`, optionally on a daily schedule.\n${relayOK()?'- Post **sentries** on web pages and tell you when they change.\n':''}${convoOK()?'- Hold a hands-free **conversation**: say \`conversation mode\`, and \`that will be all\` to end.\n':''}- Run a **system diagnostic** (\`run diagnostics\`), keep **saved conversations**, and show a **standby display** (\`standby\`).\n- **Speak up** on my own: an arrival briefing, low power, lost connection.\n${HOSTED?'':'- Install as a **desktop app** and keep alerting you in the background (Settings → Desktop app).\n'}- Take a big objective, plan it, and work it step by step with my tools. I start a mission myself when a request calls for one, or use \`/mission your objective\`.\n\nI choose my approach for each request; the label at the top shows which.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/mission objective\` · \`/clear\` · \`/export\`\n\n${HOSTED?'In this hosted view I cannot reach the internet. ':relayOK()?'':'Web search needs a relay address in Settings. '}I cannot control other apps or devices.`)}
+  addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space when not typing)':''}, and read replies aloud.\n${web}${facts}- **Calculate exactly** and **run code** in a sandbox for analysis and simulations.\n- Keep a **Library**: add text files or PDFs and I can read and search them; long work I produce is saved there for you to copy or download.\n- Run **timers and clock-time reminders**, keep **tasks and notes**, and **remember** facts about you between sessions.\n- Look at **images** you attach or paste${HOSTED?'':', or at your screen (say \`look at my screen\`)'}.\n- Put **charts, tables and weather panels** on screen.\n- Run **protocols**: routines you name and trigger with \`run the morning protocol\`, optionally on a daily schedule.\n${relayOK()?'- Post **sentries** on web pages and tell you when they change.\n':''}${convoOK()?'- Hold a hands-free **conversation**: say \`conversation mode\`, and \`that will be all\` to end.\n':''}${HOSTED?'':'- **Sync** tasks, memory, conversations and the Library across your devices (Settings → Sync)'+(miniOK()?', and float in a small **always-on-top window** (the window button, top right)':'')+'.\\n'}- Run a **system diagnostic** (\`run diagnostics\`), keep **saved conversations**, and show a **standby display** (\`standby\`).\n- **Speak up** on my own: an arrival briefing, low power, lost connection.\n${HOSTED?'':'- Install as a **desktop app** and keep alerting you in the background (Settings → Desktop app).\n'}- Take a big objective, plan it, and work it step by step with my tools. I start a mission myself when a request calls for one, or use \`/mission your objective\`.\n\nI choose my approach for each request; the label at the top shows which.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/mission objective\` · \`/clear\` · \`/export\`\n\n${HOSTED?'In this hosted view I cannot reach the internet. ':relayOK()?'':'Web search needs a relay address in Settings. '}I cannot control other apps or devices.`)}
 function clearChat(){epoch++;stop();pendingMission=null;S.history=[];save();log.innerHTML='';home();stats();hello()}
-async function exportData(){const data=JSON.stringify({...S,key:undefined,library:DOCS},null,2),fn=S.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-export.json';
+async function exportData(){const data=JSON.stringify({...S,key:undefined,sync:undefined,device:undefined,library:DOCS},null,2),fn=S.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-export.json';
   if(CAP.dl){try{await CAP.dl.save({filename:fn,data});toast('Export saved.')}catch(e){if(!e||e.code!=='declined')toast('The export could not be saved here.')}return}
   if(HOSTED)return toast('Saving files is not available in this view.');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
@@ -909,10 +937,10 @@ function renderTimers(){
 function tickTimers(){const n=$$('#timers .timer');if(n.length!==S.timers.length)return renderTimers();
   S.timers.forEach((t,i)=>{const left=(t.end-Date.now())/1000,f=left<=0;n[i].classList.toggle('fin',f);n[i].querySelector('b').textContent=f?'DONE':dur(left);n[i].querySelector('.v').setAttribute('stroke-dasharray',(81.68*(f?1:Math.max(0,1-left/t.total))).toFixed(1)+' 81.68')})}
 
-$('#right').addEventListener('click',e=>{const pr=e.target.closest('[data-prun]'),pd=e.target.closest('[data-pdel]'),wd=e.target.closest('[data-wdel]');if(pr)return runProtocol(S.protocols[+pr.dataset.prun]);if(pd){S.protocols.splice(+pd.dataset.pdel,1);save();renderPresence();return}if(wd){S.watches.splice(+wd.dataset.wdel,1);save();renderPresence();return}
-  const od=e.target.closest('[data-doc]'),dd=e.target.closest('[data-ddel]');if(od)return openDoc(+od.dataset.doc);if(dd){DOCS.splice(+dd.dataset.ddel,1);saveDocs();renderDocs();stats();return}
+$('#right').addEventListener('click',e=>{const pr=e.target.closest('[data-prun]'),pd=e.target.closest('[data-pdel]'),wd=e.target.closest('[data-wdel]');if(pr)return runProtocol(S.protocols[+pr.dataset.prun]);if(pd){tombOf('protocols',S.protocols[+pd.dataset.pdel]);S.protocols.splice(+pd.dataset.pdel,1);save();renderPresence();return}if(wd){tombOf('watches',S.watches[+wd.dataset.wdel]);S.watches.splice(+wd.dataset.wdel,1);save();renderPresence();return}
+  const od=e.target.closest('[data-doc]'),dd=e.target.closest('[data-ddel]');if(od)return openDoc(+od.dataset.doc);if(dd){tombOf('docs',DOCS[+dd.dataset.ddel]);DOCS.splice(+dd.dataset.ddel,1);saveDocs();renderDocs();stats();save();return}
   const d=e.target.closest('[data-del]'),t=e.target.closest('[data-tog]');
-  if(d){const[k,i]=d.dataset.del.split(':');S[k].splice(+i,1)}else if(t){const x=S.tasks[+t.dataset.tog];x.done=!x.done}else return;save();renderOps()});
+  if(d){const[k,i]=d.dataset.del.split(':');if(KEYOF[k])tombOf(k,S[k][+i]);S[k].splice(+i,1)}else if(t){const x=S.tasks[+t.dataset.tog];x.done=!x.done}else return;save();renderOps()});
 $$('form.add').forEach(f=>f.addEventListener('submit',e=>{e.preventDefault();if(f.dataset.add==='timer')askNotify();const i=f.querySelector('input'),v=i.value.trim();if(!v)return;
   if(f.dataset.add==='timer'){const d=splitDur(v);if(!d.s)return toast('Try: 5m tea');act({tool:'timer',seconds:d.s,label:d.label||'timer'})}else act({tool:f.dataset.add,text:v});i.value=''}));
 
@@ -930,7 +958,7 @@ function stats(){
   $('#h-bat').textContent=bat?Math.round(bat.level*100)+'%'+(bat.charging?' · charging':''):'—';
   $('#h-net').textContent=navigator.onLine?((navigator.connection&&navigator.connection.effectiveType)||'online'):'offline';
   $('#h-up').textContent=dur((Date.now()-boot)/1000);
-  $('#s-tts').textContent=!S.speak?'muted':CAP.tts?'Claude voice':neuralOK()?(NV.tts?'neural voice':'neural voice (loading)'):hasSynth?'system voice':'text only';
+  $('#s-tts').textContent=!S.speak?'muted':CAP.tts?'Claude voice':neuralPicked()?(NV.tts?'Bella':NV.failed?'unavailable here':NV.loading?'Bella (loading)':'Bella'):hasSynth?'system voice':'text only';
   $('#s-stt').textContent=CAP.dict?'dictation':HOSTED?'typing only':S.stt==='local'?'local whisper':SR?'browser':'typing only';
   $('#s-vis').textContent=engine()==='claude'?(CAP.img?'images':'off'):priced&&!visionSet.size?'no free vision model now':'images · camera · screen';
   $('#s-web').textContent=HOSTED?'not in this view':!webOK()?'off':S.relay?'search · pages · facts':'facts · weather';$('#s-code').textContent='sandbox · calculator';
@@ -948,14 +976,14 @@ let voices=[],cvoices=[],rec=null,wakeRec=null,listening=false,micStream=null,ac
 /* how good a system voice is likely to sound: natural/neural ones first, British English preferred */
 function voiceScore(v){const n=v.name,en=/^en/i.test(v.lang);let sc=en?10:0;if(/natural|neural/i.test(n))sc+=60;if(/premium|enhanced|siri/i.test(n))sc+=40;if(/^en-GB/i.test(v.lang))sc+=8;
   if(/Google UK English Male/i.test(n))sc+=30;if(/\b(Ryan|Thomas|Oliver|Arthur|George|Daniel)\b/i.test(n))sc+=12;if(/\b(Sonia|Libby|Emma|Aria|Jenny|Samantha|Serena|Kate)\b/i.test(n))sc+=6;return sc}
-const NVOICES=[['bm_george','George · British, male'],['bm_lewis','Lewis · British, male'],['bf_emma','Emma · British, female'],['am_michael','Michael · American, male'],['af_heart','Heart · American, female'],['af_bella','Bella · American, female']];
-const neuralPicked=()=>!HOSTED&&!CAP.tts&&S.vengine==='neural';
+const NVOICES=[['af_bella','Bella']];
+const neuralPicked=()=>!HOSTED&&!CAP.tts;   /* the standalone deck has one voice: Bella, generated in the browser */
 function fillVoices(){const s=$('#vsel');if(!s)return;s.dataset.k=neuralPicked()?'nvoice':'voice';
   if(CAP.tts)s.innerHTML=cvoices.map(v=>`<option value="${esc(v)}"${v===S.voice?' selected':''}>${esc(v[0].toUpperCase()+v.slice(1))}</option>`).join('')||'<option value="">Default</option>';
   else if(neuralPicked())s.innerHTML=NVOICES.map(([id,n])=>`<option value="${id}"${id===S.nvoice?' selected':''}>${n}</option>`).join('');
   else{if(hasSynth)voices=speechSynthesis.getVoices();const best=pickVoice(),list=[...voices].sort((a,b)=>voiceScore(b)-voiceScore(a));
     s.innerHTML=`<option value="">Automatic${best&&!S.voice?': '+esc(best.name):''}</option>`+list.map(v=>`<option value="${esc(v.name)}"${v.name===S.voice?' selected':''}>${esc(v.name)} · ${v.lang}${/natural|neural|premium|enhanced/i.test(v.name)?' · natural':''}${v.localService?'':' · cloud'}</option>`).join('')}
-  const ve=$('#veng-l');if(ve)ve.hidden=HOSTED||!!CAP.tts}
+  const row=s.closest('.f'),fx=$('#vfixed');if(row)row.hidden=neuralPicked();if(fx)fx.hidden=!neuralPicked()}
 if(hasSynth)try{speechSynthesis.onvoiceschanged=fillVoices}catch(e){}
 const VQ={said:0,n:0};let vAuto=null;
 function pickVoice(){if(!hasSynth)return null;if(!voices.length)voices=speechSynthesis.getVoices();const v=voices.find(v=>v.name===S.voice);if(v)return v;if(vAuto&&voices.includes(vAuto))return vAuto;
@@ -965,27 +993,27 @@ function pickVoice(){if(!hasSynth)return null;if(!voices.length)voices=speechSyn
 const NV={tts:null,loading:null,q:[],playing:false,src:null,ctx:null,failed:false,gen:0};
 const neuralOK=()=>neuralPicked()&&!NV.failed&&typeof WebAssembly==='object';
 function nvLoad(){if(NV.tts)return Promise.resolve(NV.tts);if(NV.loading)return NV.loading;let seen=-1;
-  toast('Fetching the neural voice (about 90 MB, one time)…');
+  toast('Fetching the voice (about 90 MB, one time)…');
   return NV.loading=(async()=>{const mod=await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.2.0/+esm'),K=mod.KokoroTTS||(mod.default&&mod.default.KokoroTTS);if(!K)throw new Error('voice library changed');
-    NV.tts=await K.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8',device:'wasm',progress_callback:x=>{if(x&&x.status==='progress'&&x.total>5e6){const pc=Math.floor(x.loaded/x.total*10)*10;if(pc>seen){seen=pc;toast('Fetching the neural voice: '+pc+'%')}}}});
-    toast('Neural voice ready.');stats();return NV.tts})().catch(e=>{NV.failed=true;NV.loading=null;toast('The neural voice could not be loaded here. Using the system voice.');fillVoices();stats();throw e})}
+    NV.tts=await K.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8',device:'wasm',progress_callback:x=>{if(x&&x.status==='progress'&&x.total>5e6){const pc=Math.floor(x.loaded/x.total*10)*10;if(pc>seen){seen=pc;toast('Fetching the voice: '+pc+'%')}}}});
+    toast('Voice ready.');stats();return NV.tts})().catch(e=>{NV.failed=true;NV.loading=null;toast('The voice could not be loaded on this device, so replies are text only for now.');fillVoices();stats();throw e})}
 async function nvPump(){if(NV.playing)return;NV.playing=true;const my=NV.gen;
   try{const tts=await nvLoad();
-    while(NV.q.length&&my===NV.gen){const text=NV.q.shift(),a=await tts.generate(text,{voice:NVOICES.some(v=>v[0]===S.nvoice)?S.nvoice:'bm_george',speed:+S.rate||1});if(my!==NV.gen)break;
+    while(NV.q.length&&my===NV.gen){const text=NV.q.shift(),a=await tts.generate(text,{voice:'af_bella',speed:+S.rate||1});if(my!==NV.gen)break;
       const raw=a&&(a.audio||a.data),rate=(a&&(a.sampling_rate||a.sample_rate))||24000;if(!raw||!raw.length)continue;
       const A=window.AudioContext||window.webkitAudioContext;NV.ctx=NV.ctx||new A();if(NV.ctx.state==='suspended')await NV.ctx.resume().catch(()=>{});
       const buf=NV.ctx.createBuffer(1,raw.length,rate);buf.copyToChannel(raw instanceof Float32Array?raw:Float32Array.from(raw),0);
       await new Promise(res=>{const src=NV.ctx.createBufferSource(),an2=NV.ctx.createAnalyser();an2.fftSize=128;src.buffer=buf;src.connect(an2);an2.connect(NV.ctx.destination);NV.src=src;
         const d=new Uint8Array(64),iv=setInterval(()=>{an2.getByteFrequencyData(d);let t=0;for(let i=0;i<64;i++)t+=d[i];orb.spike=Math.min(1,t/64/110)},70);
         src.onended=()=>{clearInterval(iv);res()};if(wakeRec){try{wakeRec.abort()}catch(e){}}if(orb.state!=='listening')setState('speaking');src.start()});NV.src=null}}
-  catch(e){const rest=NV.q.splice(0);NV.failed=true;NV.playing=false;if(my===NV.gen)rest.forEach(t=>sayLine(t));stats();return}
+  catch(e){NV.q.length=0;NV.failed=true;NV.playing=false;if(orb.state==='speaking')setState('idle');stats();return}
   NV.playing=false;if(my===NV.gen){if(orb.state==='speaking')setState('idle');spokeDone()}}
 const speakingNow=()=>{try{return NV.playing||NV.q.length>0||(CAP.tts?!!(CAP.tts.active&&CAP.tts.active()):(hasSynth&&(speechSynthesis.speaking||speechSynthesis.pending)))}catch(e){return false}};
 function stopSpeak(){VQ.said=0;VQ.n=0;NV.gen++;NV.q.length=0;try{NV.src&&NV.src.stop()}catch(e){}NV.playing=false;if(CAP.tts)CAP.tts.stop().catch(()=>{});else if(hasSynth)speechSynthesis.cancel();if(orb.state==='speaking')setState('idle')}
 const cleanSay=t=>t.replace(/```[\s\S]*?(```|$)/g,' The code is on screen. ').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/https?:\/\/\S+/g,'').replace(/[*_#`>|]/g,'').replace(/\s+/g,' ').trim();
 function sayLine(t){if(!t)return;
   if(CAP.tts){const o={rate:+S.rate||1};if(cvoices.includes(S.voice))o.voice=S.voice;try{Promise.resolve(CAP.tts.add?CAP.tts.add([{text:t.slice(0,1900)}],o):CAP.tts.speak(t.slice(0,1900),o)).catch(e=>{if(e&&e.code==='not_granted'){CAP.tts=null;stats();fillVoices()}})}catch(e){}return}
-  if(neuralOK()){if(NV.tts){NV.q.push(t);nvPump();return}nvLoad().catch(()=>{})}   /* until the model has arrived, the system voice covers */
+  if(neuralPicked()){if(!NV.failed){if(NV.tts){NV.q.push(t);nvPump()}else nvLoad().catch(()=>{})}return}   /* one voice only: text until it is ready */
   if(!hasSynth)return;if(wakeRec){try{wakeRec.abort()}catch(e){}}const u=new SpeechSynthesisUtterance(t),v=pickVoice();if(v)try{u.voice=v}catch(e){}u.rate=+S.rate||1;u.pitch=.96;VQ.n++;
   u.onstart=()=>{if(orb.state!=='listening')setState('speaking')};u.onboundary=()=>orb.spike=1;u.onend=u.onerror=()=>{VQ.n=Math.max(0,VQ.n-1);if(!VQ.n){if(orb.state==='speaking')setState('idle');spokeDone()}};speechSynthesis.speak(u)}
 function sayChunks(t){const lim=CAP.tts?700:240;let cur='';for(const x of t.split(/(?<=[.!?])\s+/)){if(cur&&(cur+' '+x).length>lim){sayLine(cur);cur=x}else cur=cur?cur+' '+x:x}sayLine(cur)}
@@ -1129,6 +1157,7 @@ const CMDS=()=>[
   ...(!HOSTED?[{n:'Open camera',h:'vision',f:openCam},{n:'Test model link',h:'engine',f:async()=>toast(await probe()?'Link ready · '+S.model:'Nothing is answering at '+S.url)}]:[]),
   {n:'Attach image',h:'vision',f:()=>$('#file').click()},
   {n:'What can you do?',h:'help',f:help},
+  ...(miniOK()?[{n:mini?'Close the floating window':'Floating window',h:'display',f:()=>mini?mini.close():openMini()}]:[]),
   {n:'New conversation',h:'conversation',f:newChat},{n:'Conversations…',h:'conversation',f:openThreads},{n:'Run diagnostics',h:'system',f:diagnostics},{n:'Standby display',h:'display',f:()=>setTimeout(()=>setStandby(true),50)},
   {n:'Clear conversation',h:'data',f:clearChat},{n:'Export data',h:'data',f:exportData},
   ...(convoOK()?[{n:(S.convo?'End':'Start')+' conversation mode',h:'voice',f:()=>setConvo(!S.convo)}]:[]),
@@ -1144,18 +1173,19 @@ function palRun(i){const c=pf[i];$('#pal').close();c&&c.f()}
 $('#pq').addEventListener('input',()=>{pi=0;palRender()});
 $('#pq').addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();pi=(pi+(e.key==='ArrowDown'?1:-1)+pf.length)%Math.max(1,pf.length);palRender();const s=$('#pl .sel');s&&s.scrollIntoView({block:'nearest'})}else if(e.key==='Enter'){e.preventDefault();palRun(pi)}});
 $('#pl').addEventListener('click',e=>{const li=e.target.closest('[data-i]');li&&palRun(+li.dataset.i)});
-function openSet(){const vn=$('#veng-n');if(vn)vn.hidden=HOSTED||!!CAP.tts;$('#eng-h').hidden=!HOSTED;$('#eng-l').hidden=HOSTED;$('#stt-l').hidden=HOSTED;$('#web-l').hidden=HOSTED;bgUI();$('#exp').hidden=HOSTED&&!CAP.dl;
+function openSet(){const vn=$('#veng-n');if(vn)vn.hidden=!neuralPicked();$('#eng-h').hidden=!HOSTED;$('#eng-l').hidden=HOSTED;$('#stt-l').hidden=HOSTED;$('#web-l').hidden=HOSTED;bgUI();syncUI();$('#exp').hidden=HOSTED&&!CAP.dl;
   fillVoices();fillModels();$$('[data-k]').forEach(i=>{const v=S[i.dataset.k];if(i.type==='checkbox')i.checked=!!v;else if(i.id!=='vsel'&&i.id!=='msel')i.value=v});
   $('#testr').textContent='';$('#wipe').textContent='Erase everything';$('#set').showModal()}
 $('#set').addEventListener('change',e=>{const i=e.target.closest('[data-k]');if(!i)return;const k=i.dataset.k;S[k]=i.type==='checkbox'?i.checked:i.type==='number'||i.type==='range'?+i.value:i.value.trim();
-  if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='home'){wxAt=0;wxHome=null;homeWeather()}if(k==='model'){if(S.model==='__auto'){S.auto=true;S.model=rankedModels()[0]||models[0]||''}else S.auto=false;fillModels()}if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){wakeGesture=true;wakeNeed=false;if(S.wake){if(!SR)toast('This browser has no speech recognition, so the wake word cannot listen. Use Chrome or Edge.');armWake()}else wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
+  if(k==='name'||k==='user'||k==='home')S.sv=Date.now();if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='home'){wxAt=0;wxHome=null;homeWeather()}if(k==='model'){if(S.model==='__auto'){S.auto=true;S.model=rankedModels()[0]||models[0]||''}else S.auto=false;fillModels()}if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){wakeGesture=true;wakeNeed=false;if(S.wake){if(!SR)toast('This browser has no speech recognition, so the wake word cannot listen. Use Chrome or Edge.');armWake()}else wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
   if(k==='rate'&&CAP.tts)CAP.tts.setRate(S.rate).catch(()=>{});
-  if(k==='vengine'){NV.failed=false;stopSpeak();fillVoices();if(S.vengine==='neural')nvLoad().then(()=>speak('Neural voice online'+hon()+'.',true)).catch(()=>{})}
-  if(k==='voice'||k==='nvoice'){vAuto=null;stopSpeak();speak('This is how I sound'+hon()+'.',true)}
+  if(k==='voice'){vAuto=null;stopSpeak();speak('This is how I sound'+hon()+'.',true)}
   save();setLink();stats()});
 $('#test').onclick=async()=>{const r=$('#testr');r.textContent='testing…';r.style.color='var(--dim)';const ok=await probe();r.textContent=ok?`ready · ${models.length} model${models.length===1?'':'s'} · ${lats[lats.length-1]} ms`:'no answer. Is the server running, with CORS allowed?';r.style.color=ok?'var(--ok)':'var(--amber)'};
-$('#bthr').onclick=openThreads;$('#thrnew').onclick=()=>{$('#thr').close();newChat()};
-$('#thrl').addEventListener('click',e=>{const o=e.target.closest('[data-topen]'),d=e.target.closest('[data-tdel]');if(o)openThread(o.dataset.topen);else if(d){S.threads=(S.threads||[]).filter(x=>String(x.id)!==d.dataset.tdel);save();renderThreads()}});
+$('#bthr').onclick=openThreads;$('#bmini').onclick=()=>mini?mini.close():openMini();$('#bmini').hidden=!miniOK();$('#thrnew').onclick=()=>{$('#thr').close();newChat()};
+$('#thrl').addEventListener('click',e=>{const o=e.target.closest('[data-topen]'),d=e.target.closest('[data-tdel]');if(o)openThread(o.dataset.topen);else if(d){tombOf('threads',(S.threads||[]).find(x=>String(x.id)===d.dataset.tdel));S.threads=(S.threads||[]).filter(x=>String(x.id)!==d.dataset.tdel);save();renderThreads()}});
+$('#syncon').onclick=()=>syncStart();$('#synclink').onclick=()=>syncStart($('#synccode').value);$('#syncoff').onclick=syncStop;$('#syncgo').onclick=()=>syncNow();
+$('#synccopy').onclick=e=>copyText(S.sync?S.sync.code:'',e.target);
 $('#exp').onclick=exportData;$('#instbtn').onclick=installApp;$('#bgbtn').onclick=()=>S.bg?bgDisable():bgEnable();$('#clr').onclick=()=>{clearChat();$('#set').close()};
 let wipeArm=0;$('#wipe').onclick=e=>{if(Date.now()-wipeArm<4000){epoch++;stop();pendingMission=null;if(S.bg)bgDisable();try{localStorage.removeItem(KEY)}catch(x){}S={...DEF,...VD,tasks:[],notes:[],memory:[],timers:[],history:[]};DOCS=[];try{localStorage.removeItem(KEY+'.docs')}catch(x){}renderDocs();seedProtocols();renderPresence();wxHome=null;$('#set').close();applyName();setMode('concierge');try{localStorage.removeItem(KEY)}catch(x){}log.innerHTML='';home();renderOps();stats();probe();toast('Everything erased.')}else{wipeArm=Date.now();e.target.textContent='Press again to erase'}};
 $$('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
@@ -1175,7 +1205,7 @@ async function saveFile(fn,data,type){if(CAP.dl){try{await CAP.dl.save({filename
   if(HOSTED)return toast('Saving files is not available in this view.');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:type||'text/plain'}));a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
 $('#doccp').onclick=e=>{const d=DOCS[docOpen];d&&copyText(d.text,e.target)};
 $('#docdl').onclick=()=>{const d=DOCS[docOpen];d&&saveFile((d.title.replace(/[^\w.\- ]+/g,'').trim()||'document').replace(/\.(md|txt|csv|json)$/i,'')+'.md',d.text)};
-$('#docrm').onclick=()=>{if(docOpen>=0){DOCS.splice(docOpen,1);saveDocs();renderDocs();stats()}$('#doc').close()};
+$('#docrm').onclick=()=>{if(docOpen>=0){tombOf('docs',DOCS[docOpen]);DOCS.splice(docOpen,1);saveDocs();renderDocs();stats();save()}$('#doc').close()};
 $('#att').onclick=()=>$('#file').click();
 async function openCam(){if(HOSTED)return;try{camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});$('#cam video').srcObject=camStream;$('#cam').showModal()}catch(e){toast('Camera unavailable or permission denied.')}}
 $('#cam').addEventListener('close',()=>{camStream&&camStream.getTracks().forEach(t=>t.stop());camStream=null});
@@ -1317,11 +1347,11 @@ Object.assign(RUN,{
     panel(el,`<div class="ph">${esc(String(a.title||'Table').slice(0,90))}</div><div class="tw"><table><thead><tr>${cols.map(c=>`<th>${esc(String(c))}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${(Array.isArray(r)?r:[r]).slice(0,cols.length).map(c=>`<td>${esc(String(c??''))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);return'The table is on screen.'},
   suggest(a,el){const o=(Array.isArray(a.options)?a.options:String(a.options||'').split('|')).map(x=>String(x).trim()).filter(Boolean);if(!o.length)return'No options given.';suggestChips(el,o);return'Shown.'},
   proto_save(a,el){const n=String(a.name||'').replace(/\bprotocol\b/ig,'').trim().slice(0,40),st=String(a.steps||'').trim();if(!n||!st)return'A name and the steps are both needed.';const at=/^\d{2}:\d{2}$/.test(String(a.time||''))?a.time:undefined;
-    const i=S.protocols.findIndex(p=>p.name.toLowerCase()===n.toLowerCase()),p={name:n,steps:st.slice(0,1500),at};if(i>=0)S.protocols[i]=p;else S.protocols.push(p);save();renderPresence();chip(el,'PROTOCOL ▸ '+n+(at?' · daily '+at:''));return`Protocol "${n}" saved${at?', scheduled daily at '+at+' while the deck is open':''}.`},
+    const i=S.protocols.findIndex(p=>p.name.toLowerCase()===n.toLowerCase()),p={name:n,steps:st.slice(0,1500),at,a:Date.now()};if(i>=0)S.protocols[i]=p;else S.protocols.push(p);save();renderPresence();chip(el,'PROTOCOL ▸ '+n+(at?' · daily '+at:''));return`Protocol "${n}" saved${at?', scheduled daily at '+at+' while the deck is open':''}.`},
   proto_run(a){const p=findProto(a.name);return p?`Protocol "${p.name}" steps: ${p.steps}\nCarry these out now.`:'No protocol by that name. Available: '+(S.protocols.map(p=>p.name).join(', ')||'none')},
   watch(a,el){let u;try{u=new URL(String(a.url||''))}catch(e){return'That is not a valid address.'}if(!/^https?:$/.test(u.protocol))return'Only web pages can be watched.';if(S.watches.length>=8)return'Eight sentries is the limit. Remove one first.';
-    const w={url:u.href,label:String(a.label||u.host).slice(0,50),every:Math.max(5,Math.min(1440,Math.round(+a.minutes||30))),hash:null,last:0};S.watches.push(w);save();renderPresence();chip(el,'SENTRY ▸ '+w.label+' · every '+w.every+' min');setTimeout(patrol,500);return`Watching ${w.url} every ${w.every} minutes while the deck is open. The user will be alerted when it changes.`},
-  home(a,el){const p=String(a.place||'').trim().slice(0,60);if(!p)return'No place given.';S.home=p;wxAt=0;save();chip(el,'HOME ▸ '+p);homeWeather();return'Home location set to '+p+'.'}
+    const w={url:u.href,label:String(a.label||u.host).slice(0,50),every:Math.max(5,Math.min(1440,Math.round(+a.minutes||30))),hash:null,last:0,a:Date.now()};S.watches.push(w);save();renderPresence();chip(el,'SENTRY ▸ '+w.label+' · every '+w.every+' min');setTimeout(patrol,500);return`Watching ${w.url} every ${w.every} minutes while the deck is open. The user will be alerted when it changes.`},
+  home(a,el){const p=String(a.place||'').trim().slice(0,60);if(!p)return'No place given.';S.home=p;S.sv=Date.now();wxAt=0;save();chip(el,'HOME ▸ '+p);homeWeather();return'Home location set to '+p+'.'}
 });
 const arr={type:'array',items:{type:'string'}};
 AB.push(
@@ -1414,7 +1444,7 @@ async function diagnostics(){
       if(S.relay){try{const t2=performance.now();await getJSON(rbase()+'/health',8000);add('Relay',true,Math.round(performance.now()-t2)+' ms')}catch(e){add('Relay',false,e.message)}
         if(webOK()){try{const j=await getJSON(rbase()+'/search?q='+enc('weather forecast'),20000);add('Web search',(j.results||[]).length>0,(j.results||[]).length+' results'+(j.engine?' via '+j.engine:''))}catch(e){add('Web search',false,e.message)}}else add('Web search',null,'turned off')}
       else add('Relay',null,'not set: no web search or background alerts')}
-    add('Voice out',!S.speak?null:!!(CAP.tts||hasSynth),!S.speak?'muted':CAP.tts?'Claude voice':hasSynth?((pickVoice()||{}).name||'system voice'):'not available');
+    add('Voice out',!S.speak?null:CAP.tts?true:neuralPicked()?(NV.tts?true:NV.failed?false:null):!!hasSynth,!S.speak?'muted':CAP.tts?'Claude voice':neuralPicked()?(NV.tts?'Bella, ready':NV.failed?'Bella could not load on this device':'Bella, loads on first use'):hasSynth?'system voice':'not available');
     let mic='';try{mic=(await navigator.permissions.query({name:'microphone'})).state}catch(e){}
     add('Voice in',!micOK()?null:mic!=='denied',CAP.dict?'dictation':!micOK()?'typing only':(S.stt==='local'?'local whisper':'browser recognition')+(mic?' · microphone '+mic:''));
     if(!HOSTED){add('Wake word',!S.wake?null:!!wakeRec,!S.wake?'off':wakeRec?'armed for "'+S.name+'"':wakeNeed?'needs one click to arm':'not listening');
@@ -1438,7 +1468,7 @@ function ambTick(){if(!inStandby())return;const d=new Date(),nt=S.timers.filter(
 function setStandby(on){on=!!on;if(on===inStandby())return;document.body.classList.toggle('standby',on);$$('dialog[open]').forEach(d=>d.close());
   if(on){ambTick();try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(l=>{wakeLock=l}).catch(()=>{})}catch(e){}}
   else{try{wakeLock&&wakeLock.release()}catch(e){}wakeLock=null;lastAct=Date.now();if(innerWidth>1080)inp.focus()}}
-function touched(e){lastAct=Date.now();if(inStandby()){setStandby(false);if(e&&e.type==='keydown'&&e.key!==' '){e.preventDefault()}}}
+function touched(e){lastAct=Date.now();if(neuralPicked()&&S.speak&&!NV.tts&&!NV.loading&&!NV.failed)nvLoad().catch(()=>{});if(inStandby()){setStandby(false);if(e&&e.type==='keydown'&&e.key!==' '){e.preventDefault()}}}
 addEventListener('pointerdown',touched,true);addEventListener('keydown',touched,true);
 
 /* ---------- saved conversations ---------- */
@@ -1450,6 +1480,104 @@ function renderThreads(){const l=S.threads||[];$('#thrl').innerHTML=l.map(t=>`<l
 function openThreads(){renderThreads();$('#thr').showModal()}
 function openThread(id){const t=(S.threads||[]).find(x=>String(x.id)===String(id));if(!t)return;epoch++;stop();pendingMission=null;archive();S.threads=S.threads.filter(x=>x.id!==t.id);S.history=t.history||[];save();renderLog();stats();hello();$('#thr').close()}
 
+/* ---------- sync across devices (encrypted in the browser before it leaves) ---------- */
+const KEYOF={tasks:x=>x.text,notes:x=>x.text,memory:x=>x.text,protocols:x=>String(x.name||'').toLowerCase(),watches:x=>x.url,threads:x=>String(x.id),timers:x=>x.label+'@'+Math.round(x.end/1000)};
+const addedAt=(n,x)=>n==='threads'?(+x.t||+x.id||0):n==='timers'?(+x.a||Math.floor(+x.id)||0):(+x.a||+x.t||0);
+function tombOf(name,x){if(!x)return;const T=S.tomb&&typeof S.tomb==='object'?S.tomb:(S.tomb={});T[name+':'+(name==='docs'?x.title:KEYOF[name](x))]=Date.now();
+  const ks=Object.keys(T);if(ks.length>500)ks.sort((a,b)=>T[a]-T[b]).slice(0,ks.length-400).forEach(k=>delete T[k])}
+var histSig='',syncBusy=false,syncT=0;
+const hsig=()=>S.history.length+':'+((S.history[S.history.length-1]||{}).t||0);
+function markHist(){const h=hsig();if(h!==histSig){if(histSig!=='')S.hat=Date.now();histSig=h}}
+const b64of=u=>{let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s)};
+const b64to=s=>{const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u};
+async function syncKeys(code){const e=new TextEncoder(),h=async t=>new Uint8Array(await crypto.subtle.digest('SHA-256',e.encode(t)));
+  return{id:[...await h('vega-sync-id:'+code)].map(x=>x.toString(16).padStart(2,'0')).join(''),k:await crypto.subtle.importKey('raw',await h('vega-sync-key:'+code),'AES-GCM',false,['encrypt','decrypt'])}}
+async function seal(k,obj){const iv=crypto.getRandomValues(new Uint8Array(12)),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},k,new TextEncoder().encode(JSON.stringify(obj)))),all=new Uint8Array(12+ct.length);all.set(iv);all.set(ct,12);return b64of(all)}
+async function unseal(k,b){const all=b64to(b);return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:all.slice(0,12)},k,all.slice(12))))}
+function snapshot(lean){return{v:1,at:Date.now(),sv:+S.sv||0,name:S.name,user:S.user,home:S.home,tasks:S.tasks,notes:S.notes,memory:S.memory,protocols:S.protocols,
+  watches:(S.watches||[]).map(w=>({url:w.url,label:w.label,every:w.every,a:w.a})),threads:lean?(S.threads||[]).slice(0,5):(S.threads||[]),timers:S.timers.filter(t=>!t.fired),
+  history:S.history.slice(-80),hat:+S.hat||0,docs:lean?undefined:DOCS,tomb:S.tomb||{}}}
+const sigOf=o=>{const c={...o};delete c.at;const j=JSON.stringify(c);return j.length+':'+hash(j)};
+function mergeState(r){if(!r||r.v!==1)return;const T=S.tomb&&typeof S.tomb==='object'?S.tomb:(S.tomb={});for(const k in r.tomb||{})T[k]=Math.max(+T[k]||0,+r.tomb[k]||0);
+  for(const n of Object.keys(KEYOF)){const kf=KEYOF[n],m=new Map();
+    for(const x of Array.isArray(r[n])?r[n]:[])if(x&&typeof x==='object')m.set(kf(x),x);
+    for(const x of Array.isArray(S[n])?S[n]:[]){const k=kf(x),o=m.get(k);m.set(k,!o?x:n==='tasks'?{...o,...x,done:!!(o.done||x.done)}:addedAt(n,o)>addedAt(n,x)?{...x,...o}:{...o,...x})}
+    S[n]=[...m].filter(([k,x])=>!((+T[n+':'+k]||0)>addedAt(n,x))).map(e=>e[1])}
+  S.threads=S.threads.sort((a,b)=>(+b.t||0)-(+a.t||0)).slice(0,15);
+  if((+r.sv||0)>(+S.sv||0)){S.name=r.name||S.name;S.user=r.user==null?S.user:r.user;S.home=r.home==null?S.home:r.home;S.sv=+r.sv;applyName();wxAt=0;wxHome=null;homeWeather()}
+  if((+r.hat||0)>(+S.hat||0)&&Array.isArray(r.history)&&!busy){S.history=r.history;S.hat=+r.hat;histSig=hsig();renderLog()}
+  if(Array.isArray(r.docs)){const m=new Map(r.docs.filter(d=>d&&d.title).map(d=>[d.title,d]));for(const d of DOCS){const o=m.get(d.title);m.set(d.title,o&&(+o.t||0)>(+d.t||0)?o:d)}
+    DOCS=[...m.values()].filter(d=>!((+T['docs:'+d.title]||0)>(+d.t||0)));saveDocs()}
+  persist();renderOps();renderPresence();renderDocs();stats()}
+async function syncNow(){
+  if(HOSTED||!S.sync||!S.sync.code||!S.relay||syncBusy||!navigator.onLine)return;syncBusy=true;const sy=S.sync;
+  try{const{id,k}=await syncKeys(sy.code);
+    const r=await getJSON(rbase()+'/state?id='+id+'&rev='+(sy.rev||0));
+    if(r.blob){mergeState(await unseal(k,r.blob));sy.rev=r.rev}
+    if(sigOf(snapshot())!==sy.sig){
+      for(let i=0;i<4;i++){let blob=await seal(k,snapshot());if(blob.length>2900000)blob=await seal(k,snapshot(true));
+        const res=await fetch(rbase()+'/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,base:sy.rev||0,blob})}),j=await res.json().catch(()=>({}));
+        if(res.status===409&&j.blob){mergeState(await unseal(k,j.blob));sy.rev=j.rev;continue}
+        if(!res.ok)throw new Error((j.error&&j.error.message)||('the relay answered with status '+res.status));
+        sy.rev=j.rev;sy.sig=sigOf(snapshot());break}}
+    sy.at=Date.now();sy.err=''}
+  catch(e){sy.err=/decrypt|operation/i.test(String(e&&e.message))?'this code does not open the saved data':(e&&e.message)||'sync did not complete'}
+  syncBusy=false;if(S.sync===sy)persist();syncUI()}
+function syncSoon(){try{if(HOSTED||!S.sync||!S.sync.code)return;clearTimeout(syncT);syncT=setTimeout(syncNow,3500)}catch(e){}}
+function syncUI(){const on=!!(S.sync&&S.sync.code),a=$('#sync-on');if(!a)return;$('#sync-l').hidden=HOSTED;a.hidden=!on;$('#sync-off').hidden=on;if(on)$('#syncshow').value=S.sync.code;
+  $('#syncst').textContent=!on?(S.relay?'Sync is off on this device.':'Sync needs the relay address above.'):S.sync.err?'Sync problem: '+S.sync.err+'.':S.sync.at?'In sync. Last checked '+hm(new Date(S.sync.at))+'.':'Starting sync…'}
+function syncStart(code){if(!S.relay)return toast('Sync needs the relay address in Settings.');
+  if(!code){const a='abcdefghijklmnopqrstuvwxyz234567',r=crypto.getRandomValues(new Uint8Array(26));code='vega-'+[...r].map(x=>a[x%32]).join('')}
+  code=String(code).trim().toLowerCase();if(!/^vega-[a-z2-7]{26}$/.test(code))return toast('That does not look like a sync code. It starts with "vega-".');
+  S.sync={code,rev:0,sig:'',at:0,err:''};persist();syncUI();syncNow()}
+function syncStop(){S.sync=null;persist();syncUI();toast('Sync is off on this device. Your data stays here.')}
+addEventListener('focus',()=>syncSoon());setInterval(()=>{if(S.sync&&S.sync.code&&!busy)syncNow()},45000);
+
+/* ---------- floating mini-window ---------- */
+var mini=null;
+function miniOK(){return !HOSTED&&'documentPictureInPicture'in window}
+async function openMini(){
+  if(!miniOK())return toast('The floating window needs Chrome or Edge on a computer.');
+  if(mini)return;let w;try{w=await window.documentPictureInPicture.requestWindow({width:340,height:420})}catch(e){return toast('The floating window could not be opened. Click the button directly to allow it.')}
+  mini=w;const d=w.document;d.title=S.name;
+  d.head.innerHTML=`<style>
+    *{box-sizing:border-box}html,body{height:100%;margin:0}
+    body{background:radial-gradient(ellipse 100% 70% at 50% 30%,#0a1420,#04070b 70%) #04070b;color:#e4eaf1;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;overflow:hidden;--a:255,180,84}
+    canvas{flex:1;min-height:0;width:100%;display:block}
+    #s{text-align:center;font:600 10px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.4em;text-transform:uppercase;color:rgb(var(--a));padding:0 8px 6px}
+    #t{flex:none;max-height:38%;overflow:auto;padding:0 14px 8px;text-align:center;color:#c6d0db;font-size:13.5px;scrollbar-width:thin}
+    form{flex:none;display:flex;gap:6px;padding:8px;border-top:1px solid rgba(130,175,215,.2);background:rgba(8,12,18,.9)}
+    input{flex:1;min-width:0;background:rgba(2,4,7,.7);border:1px solid rgba(130,175,215,.3);color:inherit;font:inherit;padding:8px 10px;outline:0}
+    input:focus{border-color:rgb(var(--a))}
+    button{flex:none;width:36px;height:36px;display:grid;place-items:center;background:none;border:1px solid rgba(130,175,215,.3);color:#8f9cab;cursor:pointer}
+    button:hover{color:rgb(var(--a));border-color:rgb(var(--a))}
+    button.on{background:rgb(var(--a));border-color:rgb(var(--a));color:#04070b}
+    svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  </style>`;
+  d.body.innerHTML=`<canvas id="o"></canvas><div id="s"></div><div id="t"></div><form id="f">
+    <button type="button" id="m" title="Talk" aria-label="Talk"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+    <input id="i" placeholder="Ask ${esc(S.name)}…" autocomplete="off" aria-label="Message">
+    <button type="button" id="x" title="Stop" aria-label="Stop"><svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10"/></svg></button></form>`;
+  const q=s=>d.querySelector(s),cv=q('#o'),x=cv.getContext('2d'),P=[];for(let i=0;i<520;i++){const y=1-2*(i+.5)/520,r=Math.sqrt(1-y*y),a=i*2.399963;P.push([Math.cos(a)*r,y,Math.sin(a)*r])}
+  q('#f').addEventListener('submit',e=>{e.preventDefault();const v=q('#i').value.trim();q('#i').value='';if(v)send(v)});
+  q('#m').onclick=()=>listening?unlisten():listen(true);q('#x').onclick=()=>{stop();listening&&unlisten()};
+  let ang=0,last=0,alive=true;
+  const tick=setInterval(()=>{if(!alive)return;d.body.style.setProperty('--a',orb.rgb);q('#s').textContent=$('#st').textContent;q('#m').classList.toggle('on',listening);
+    const c=$('#cap').textContent,ai=log.querySelectorAll('.msg.ai .body'),lastAi=ai.length?ai[ai.length-1].innerText:'',t=c||(lastAi.length>520?'…'+lastAi.slice(-520):lastAi);
+    if(q('#t').textContent!==t){q('#t').textContent=t;q('#t').scrollTop=q('#t').scrollHeight}},250);
+  const frame=ms=>{if(!alive)return;w.requestAnimationFrame(frame);const t=ms/1000,dt=Math.min(.05,t-last);last=t;const D=Math.min(w.devicePixelRatio||1,2),W=Math.round(cv.clientWidth*D),H=Math.round(cv.clientHeight*D);if(!W||!H)return;if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H}
+    ang+=orb.spin*dt;x.clearRect(0,0,W,H);const cx=W/2,cy=H/2,R=Math.min(W,H)*.3,c=orb.rgb,st=orb.state,ca=Math.cos(ang),sa=Math.sin(ang),cb=Math.cos(.38),sb=Math.sin(.38);
+    const g=x.createRadialGradient(cx,cy,0,cx,cy,R*2);g.addColorStop(0,`rgba(${c},${.2+orb.amp})`);g.addColorStop(1,`rgba(${c},0)`);x.fillStyle=g;x.fillRect(0,0,W,H);x.globalCompositeOperation='lighter';
+    for(const p of P){let n=Math.sin(p[1]*4+t*1.4)*Math.sin(p[0]*3-t*.9+p[2]*2);if(st==='thinking')n+=Math.sin(p[1]*9-t*5)*.6;const k=1+orb.amp*n*1.6;let X=(p[0]*ca+p[2]*sa)*k,Z=(-p[0]*sa+p[2]*ca)*k,Y=p[1]*k;const Y2=Y*cb-Z*sb;Z=Y*sb+Z*cb;
+      const s=1.7/(2.4-Z),al=.1+.9*Math.max(0,(Z+1.2)/2.4),sz=(.7+(Z+1)*.7)*D;x.fillStyle=`rgba(${c},${al*al})`;x.fillRect(cx+X*R*s-sz/2,cy+Y2*R*s-sz/2,sz,sz)}
+    x.strokeStyle=`rgba(${c},.35)`;x.lineWidth=D;for(let i=0;i<6;i++){const a0=t*.35+i*Math.PI/3;x.beginPath();x.arc(cx,cy,R*1.55,a0,a0+(i%2?.3:.55));x.stroke()}x.globalCompositeOperation='source-over'};
+  w.requestAnimationFrame(frame);
+  w.addEventListener('pagehide',()=>{alive=false;clearInterval(tick);mini=null;const b=$('#bmini');b&&b.classList.remove('on')});
+  const b=$('#bmini');b&&b.classList.add('on');setTimeout(()=>{try{q('#i').focus()}catch(e){}},100)}
+
+/* keep the composer above the on-screen keyboard */
+if(window.visualViewport){const vv=window.visualViewport,fit=()=>{const kb=innerHeight-vv.height>120;if(kb)document.documentElement.style.setProperty('--vvh',Math.round(vv.height)+'px');else document.documentElement.style.removeProperty('--vvh');if(kb)setTimeout(scroll,60)};vv.addEventListener('resize',fit)}
+
 /* ---------- boot ---------- */
 if(innerWidth<600)inp.placeholder='Speak or type…';
 applyName();setMode('concierge');
@@ -1458,7 +1586,7 @@ renderLog();
 seedProtocols();S.convo=false;home();renderOps();renderDocs();renderPresence();stats();fillVoices();
 if(!HOSTED)probe().then(()=>{stats();armWake()});
 booted=true;if(innerWidth>1080)inp.focus();
-bootLines();arrival();setInterval(sentinel,30000);swInit();
+histSig=hsig();bootLines();arrival();setInterval(sentinel,30000);swInit();syncSoon();
 function runHash(){if(HOSTED)return;const h=location.hash;if(!/^#(run-|talk$|mission$)/.test(h))return;try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
   if(h==='#talk')setTimeout(()=>listen(true),700);else if(h==='#mission'){inp.value='/mission ';inp.focus()}else handleItem({data:{kind:'protocol',run:decodeURIComponent(h.slice(5))}})}
 runHash();addEventListener('hashchange',runHash);
