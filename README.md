@@ -16,11 +16,16 @@ It also works with any OpenAI-style endpoint. For a fully private setup point it
 
 - **Core**: a particle sphere that reacts to listening, thinking and speaking.
 - **One adaptive assistant**: VEGA reads each request and picks its own approach (conversation, operations, visual analysis, hands-on steps, deep reasoning or a full mission). The deck's accent colour follows.
-- **Actions**: ask in plain words to set timers, add or complete tasks, take notes, remember facts about you, or switch mode. Slash commands do the same: `/timer 5m tea`, `/task`, `/note`, `/remember`, `/mission`, `/clear`, `/export`.
-- **Missions**: for a big objective VEGA plans it, works each step, then delivers the result. It starts one on its own, or use `/mission`.
+- **Real tools, used on its own judgement**:
+  - **Web search and page reading** through the relay, with source links on the reply.
+  - **Encyclopedia and weather** lookups.
+  - **Exact calculation** and **sandboxed code** for analysis and simulations (no network or page access inside the sandbox).
+  - **Library**: drop in text files and VEGA can read and search them; long work it writes is saved there to copy or download.
+  - **Timers, clock-time reminders, tasks, notes and long-term memory.**
+- **Missions**: for a big objective VEGA plans it, works each step with its tools, delivers the result and files it in the Library. It starts one on its own, or use `/mission`.
 - **Voice**: hold Space to talk; replies can be read aloud. Optional wake word.
 - **Vision**: attach, paste or capture an image for a vision-capable model.
-- **Command palette**: Ctrl+K.
+- **Command palette**: Ctrl+K. Slash commands: `/timer 5m tea`, `/task`, `/note`, `/remember`, `/mission`, `/clear`, `/export`.
 
 ## Privacy and keys
 
@@ -34,7 +39,8 @@ It also works with any OpenAI-style endpoint. For a fully private setup point it
 - `index.html` — the standalone deck. Open this.
 - `src/vega.src.html` — the source. It is also what gets published as a hosted page, where it uses the host's built-in model and voice instead of an endpoint.
 - `build.py` — regenerates `index.html` from the source.
+- `relay/` — optional server-side relay: keeps the API key off the page, enforces free models, and adds web search and page reading. See `relay/README.md`.
 
 ## Limits
 
-The assistant can reason, write, look at images and use the deck's own actions. It cannot browse the web, read files or control devices.
+Web search and page reading need the relay. Wikipedia and weather lookups go straight from your browser to those services, only when VEGA uses them; turn off "Allow web tools" in Settings to stop all of it. The Library reads text files only (no PDF or Office files). VEGA cannot control other apps or devices.

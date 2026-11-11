@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0}</style></head><body>
-<script>window.VEGA_DEFAULTS={url:"https://openrouter.ai/api/v1",freeOnly:true}</script>
+<script>window.VEGA_DEFAULTS={"url":"https://openrouter.ai/api/v1","freeOnly":true}</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <title>VEGA Command Deck</title>
 <style>
@@ -226,6 +226,12 @@ dialog::backdrop{background:rgba(2,4,7,.72);backdrop-filter:blur(4px)}
 #pl li small{font:10px var(--mono);color:var(--faint);letter-spacing:.12em;text-transform:uppercase}
 #pl li:hover{background:rgba(130,175,215,.07)}
 #pl li.sel{background:rgba(var(--accrgb),.13);color:var(--acc);box-shadow:inset 2px 0 0 var(--acc)}
+.dl{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .15s}.dl:hover{color:var(--acc)}
+.list small{font:10px var(--mono);color:var(--faint);white-space:nowrap;margin-top:3px}
+#adddoc{margin-top:10px;width:100%}
+button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
+#doc{width:min(860px,calc(100vw - 32px))}#doct{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;padding-right:12px}
+#docb{max-height:58vh;overflow:auto;padding-right:6px}.docbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
 #cam video{display:block;width:100%;background:#000;aspect-ratio:4/3}
 #toast{position:fixed;left:50%;bottom:calc(124px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);background:rgba(9,14,20,.96);border:1px solid rgba(var(--accrgb),.55);box-shadow:0 0 24px rgba(var(--accrgb),.25);padding:10px 18px;font:500 12px var(--mono);letter-spacing:.04em;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:calc(100vw - 32px)}
 #toast.on{opacity:1;transform:translate(-50%,0)}
@@ -280,10 +286,12 @@ dialog::backdrop{background:rgba(2,4,7,.72);backdrop-filter:blur(4px)}
       <div class="kv"><span>exchanges</span><b id="exc">0</b></div>
       <div class="kv"><span>uptime</span><b id="h-up">0:00</b></div>
     </section>
-    <section class="card"><h3>Senses</h3>
+    <section class="card"><h3>Abilities</h3>
       <div class="kv"><span>voice out</span><b id="s-tts">—</b></div>
       <div class="kv"><span>voice in</span><b id="s-stt">—</b></div>
       <div class="kv"><span>vision</span><b id="s-vis">—</b></div>
+      <div class="kv"><span>web</span><b id="s-web">—</b></div>
+      <div class="kv"><span>code</span><b id="s-code">—</b></div>
       <div class="kv" id="r-wake"><span>wake word</span><b id="s-wake">—</b></div>
     </section>
     <section class="card"><h3>Host</h3>
@@ -307,12 +315,12 @@ dialog::backdrop{background:rgba(2,4,7,.72);backdrop-filter:blur(4px)}
       <div class="row">
         <button type="button" class="tb" id="mic" title="Talk: click, or hold Space when not typing" aria-label="Talk"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
         <textarea id="inp" rows="1" placeholder="Speak or type. / for commands." autocomplete="off"></textarea>
-        <button type="button" class="tb" id="att" title="Attach image" aria-label="Attach image"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.3"/></svg></button>
+        <button type="button" class="tb" id="att" title="Attach an image or a text file" aria-label="Attach an image or a text file"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.3"/></svg></button>
         <button type="button" class="tb" id="bcam" title="Camera" aria-label="Camera"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
         <button class="tb" id="go" title="Send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
       <div class="hint"><span><kbd>Enter</kbd> send</span><span><kbd>Shift Enter</kbd> new line</span><span><kbd>/</kbd> commands</span><span><kbd>Ctrl K</kbd> palette</span><span><kbd>Esc</kbd> stop</span></div>
-      <input type="file" id="file" accept="image/*" multiple hidden>
+      <input type="file" id="file" accept="image/*,text/*,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xml,.html,.css,.js,.ts,.py,.yml,.yaml,.sql,.sh" multiple hidden>
     </form>
   </main>
 
@@ -325,6 +333,8 @@ dialog::backdrop{background:rgba(2,4,7,.72);backdrop-filter:blur(4px)}
       <form class="add" data-add="note"><input id="a-nt" placeholder="+ add note" aria-label="Add note"></form></section>
     <section class="card"><h3>Memory <small id="n-mm"></small></h3><ul class="list" id="memory"></ul>
       <form class="add" data-add="remember"><input id="a-mm" placeholder="+ a fact to always remember" aria-label="Add memory"></form></section>
+    <section class="card"><h3>Library <small id="n-dc"></small></h3><ul class="list" id="docs"></ul>
+      <button class="btn" id="adddoc" type="button">+ Add text files</button></section>
   </aside>
 </div>
 
@@ -344,6 +354,11 @@ dialog::backdrop{background:rgba(2,4,7,.72);backdrop-filter:blur(4px)}
       <div class="f"><label for="k-ctx">Context window</label><input id="k-ctx" data-k="ctx" type="number" min="1024" step="1024"></div>
       <div class="f"><span></span><div><button class="btn" id="test" type="button">Test link</button> <span id="testr" style="font:11px var(--mono);margin-left:8px"></span></div></div>
       <p class="note">Works with Ollama (<code>http://localhost:11434/v1</code>), LM Studio (<code>:1234/v1</code>), llama.cpp, vLLM, or anything that speaks <code>/chat/completions</code>. Also works with hosted gateways such as OpenRouter (<code>https://openrouter.ai/api/v1</code>); with a hosted gateway your messages go to that service and the model's provider. Free models only applies where the service lists prices.</p>
+    </div>
+    <div id="web-l"><h3>Web tools</h3>
+      <div class="f"><label for="k-web">Allow web tools</label><input id="k-web" data-k="web" type="checkbox"></div>
+      <div class="f"><label for="k-relay">Relay address</label><input id="k-relay" data-k="relay" spellcheck="false" placeholder="https://…/functions/v1/vega-relay"></div>
+      <p class="note">With web tools on, VEGA can consult Wikipedia and a weather service directly, and search the web and read pages through your relay. A request leaves this browser only when VEGA uses one of those tools.</p>
     </div>
     <h3>Identity</h3>
     <div class="f"><label for="k-name">Assistant name</label><input id="k-name" data-k="name" maxlength="18"></div>
@@ -366,6 +381,7 @@ dialog::backdrop{background:rgba(2,4,7,.72);backdrop-filter:blur(4px)}
 </dialog>
 <dialog id="pal"><input id="pq" placeholder="Type a command…" autocomplete="off" aria-label="Command"><ul id="pl"></ul></dialog>
 <dialog id="cam"><div class="dh"><span>Visual feed</span><button class="ib" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><video autoplay playsinline muted></video><div class="db"><button class="btn" id="snap" type="button">Capture frame</button></div></dialog>
+<dialog id="doc"><div class="dh"><span id="doct"></span><button class="ib" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="db"><div class="body" id="docb"></div><div class="docbar"><button class="btn" id="doccp" type="button">Copy</button><button class="btn" id="docdl" type="button">Download</button><button class="btn" id="docrm" type="button">Delete</button></div></div></dialog>
 <div id="toast" role="status"></div>
 
 <script>
@@ -397,13 +413,14 @@ function classify(t,imgs){
   if(/\b(status|brief(ing)?|report|schedule|agenda|priorit\w+|deadline|tasks?|timers?|remind|today|tomorrow|this week)\b/i.test(t))return'ops';
   return'concierge'}
 const DEF={name:'VEGA',user:'',url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,
-  freeOnly:true,stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
+  freeOnly:true,web:true,relay:'',stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
 const VD=window.VEGA_DEFAULTS||{};
 let S={...DEF,...VD};
 let hadSaved=false;try{const raw=localStorage.getItem(KEY);hadSaved=raw!==null;S={...S,...JSON.parse(raw||'{}')}}catch(e){}
 if(VD.key&&!S.key&&(!hadSaved||S.url===VD.url)){S.url=VD.url||S.url;S.key=VD.key;S.model=''}
 ['tasks','notes','memory','timers','history'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({...S,history:S.history.slice(-200)}))}catch(e){}};
+if(VD.relay&&!S.relay)S.relay=VD.relay;
 let epoch=0,lastImgs=[],booted=false,inMission=false,pendingMission=null,online=false,models=[],priced=false,freeSet=new Set(),ctxMap={},busy=false,ctl=null,pending=[],sessTok=0,lats=[],boot=Date.now(),capsDone=!HOSTED;
 const log=$('#log'),inp=$('#inp');
 const dial=(id,f)=>{const c=document.querySelector('#'+id+' .v');if(c)c.style.strokeDasharray=(150.8*Math.max(0,Math.min(1,f||0)))+' 201.1'};
@@ -514,13 +531,14 @@ Open tasks: ${open.length?open.map(t=>t.text).join('; '):'none'}
 Notes: ${S.notes.length?S.notes.slice(-8).map(n=>n.text).join('; '):'none'}
 Active timers: ${S.timers.length?S.timers.map(t=>t.label+' ('+dur((t.end-Date.now())/1000)+' left)').join('; '):'none'}
 Long-term memory: ${S.memory.length?S.memory.map(m=>m.text).join('; '):'empty'}
+Library documents: ${DOCS.length?DOCS.map(d=>d.title).join('; '):'none'}
 
-ACTIONS
-${cl?'You have tools for timers, tasks, notes, memory, links and starting a mission. Use them whenever the user asks for such an action, or shares a durable fact about themselves worth remembering; then confirm briefly in words. You have no other tools: no web access, no files.'
-:`When the user asks you to do one of these things, append an action line at the very end of your reply, exactly in this form:
-<<act {"tool":"timer","seconds":300,"label":"tea"}>>
-Tools: timer{seconds,label} · task{text} · done{text} · note{text} · remember{text} (durable facts about the user) · forget{text} · open{url} · mission{objective} (hands a substantial multi-step objective to your mission planner; say in one sentence that you are starting it and do not do the work in that reply)
-Use one line per action. Never mention this syntax, and do not use it unless an action is wanted. You have no other tools: no internet, no file access.`}`}
+TOOLS
+${cl?`You have real tools. Use them whenever they make the answer more accurate or get something done: look things up instead of guessing, calculate instead of estimating, read the user's Library documents when they are relevant, and save long deliverables to the Library. When the user shares a durable fact about themselves, remember it.${HOSTED?' You cannot reach the internet from this view; say so if asked for live information.':''}`
+:`You have real tools. To use one, write a line exactly like this at the very end of your reply, one line per call:
+<<act {"tool":"calc","expression":"17*23"}>>
+${toolset().map(t=>`${t.id}{${Object.keys(t.p||{}).join(',')}}${t.info?' [returns data]':''} - ${t.d}`).join('\n')}
+Tools marked [returns data] send their results back to you and you then continue your answer; when you call one, write only a short lead-in and wait for the results. Never invent a result, never show this syntax to the user, and call a tool only when it is needed. Look things up instead of guessing, and calculate instead of estimating.${relayOK()?'':' Web search and page reading are not connected here.'}`}`}
 function buildMsgs(imgs){
   let budget=S.ctx*4*.6;const out=[];
   for(let i=S.history.length-1;i>=0;i--){const m=S.history[i];budget-=m.content.length;if(budget<0&&out.length)break;out.unshift({role:m.role,content:m.content})}
@@ -536,10 +554,11 @@ function addMsg(role,text,o={}){
   const who=role==='user'?(S.user||'You'):role==='sys'?'Deck':S.name;
   el.innerHTML=`<div class="who"><span>${esc(who)}</span><time>${hm(o.t?new Date(o.t):new Date())}</time>${o.tag?`<em>${esc(o.tag)}</em>`:''}</div><div class="body"></div>${o.imgs&&o.imgs.length?`<div class="thumbs">${o.imgs.map(u=>`<img src="${u}" alt="attachment">`).join('')}</div>`:''}<div class="acts"></div>`;
   setBody(el,text);el._t=text;log.append(el);home();scroll();return el}
-function chip(el,text,href){const a=document.createElement(href?'a':'span');a.className='act';a.textContent=text;if(href){a.href=href;a.target='_blank';a.rel='noopener noreferrer'}el.querySelector('.acts').append(a)}
+function chip(el,text,href){if(!el||!el.querySelector('.acts'))return;const a=document.createElement(href?'a':'span');a.className='act';a.textContent=text;if(href){a.href=href;a.target='_blank';a.rel='noopener noreferrer'}el.querySelector('.acts').append(a)}
 function tools(el,retry){if(el.querySelector('.tools'))return;const d=document.createElement('div');d.className='tools';
   d.innerHTML=(retry?'':'<button class="mb" data-a="copy" type="button">Copy</button><button class="mb" data-a="say" type="button">Speak</button>')+'<button class="mb" data-a="retry" type="button">Retry</button>';el.append(d)}
-log.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const el=b.closest('.msg'),a=b.dataset.a;
+log.addEventListener('click',e=>{const dc=e.target.closest('[data-doctitle]');if(dc){const i=DOCS.findIndex(d=>d.title===dc.dataset.doctitle);i>=0?openDoc(i):toast('That document was deleted.');return}
+  const b=e.target.closest('[data-a]');if(!b)return;const el=b.closest('.msg'),a=b.dataset.a;
   if(a==='code')copyText(b.parentElement.querySelector('code').textContent,b);
   else if(a==='copy')copyText(el._t||el.querySelector('.body').innerText,b);
   else if(a==='say')speak(el._t||'',true);
@@ -559,44 +578,147 @@ function act(a,el){
     case'mission':{const o=String(a.objective||a.text||'').trim();if(inMission)out='A mission is already running; finish this reply normally.';else if(o){pendingMission=o;say('MISSION ▸ '+o.slice(0,70));out='Mission queued and will start right after this reply. Tell the user in one short sentence that you are starting it. Do not do the work in this reply.'}break}
   }
   save();renderOps();return out}
-function runActs(full,el){const re=/<<act\s*(\{[\s\S]*?\})\s*>>/g;let m;while((m=re.exec(full))){try{act(JSON.parse(m[1]),el)}catch(e){}}}
-const T=(name,description,properties,required,tool,el)=>({name,description,inputSchema:{type:'object',properties,required},execute:i=>act({...i,tool},el)});
-const str={type:'string'};
-const TOOLS=el=>[
-  T('set_timer','Start a countdown timer on the user\'s deck. Returns a confirmation.',{seconds:{type:'number',description:'Duration in seconds'},label:str},['seconds'],'timer',el),
-  T('add_task','Add a task to the user\'s task list. Returns a confirmation.',{text:str},['text'],'task',el),
-  T('complete_task','Mark an open task done by matching part of its text. Returns which task was completed, or that none matched.',{text:str},['text'],'done',el),
-  T('add_note','Save a short note to the deck. Returns a confirmation.',{text:str},['text'],'note',el),
-  T('remember','Store a durable fact about the user in long-term memory (preferences, names, routines). Returns a confirmation.',{text:str},['text'],'remember',el),
-  T('forget','Remove long-term memories containing the given text. Returns whether anything was removed.',{text:str},['text'],'forget',el),
-  T('offer_link','Show the user a button that opens an https URL in a new tab. Returns a confirmation; the user must click it.',{url:str},['url'],'open',el),
-  T('start_mission','Hand a substantial multi-step objective (research, a plan, a design, a comparison, a long document) to the mission planner, which breaks it into steps and works through them on screen. Use it instead of answering such a request in one reply. Returns a confirmation.',{objective:{type:'string',description:'The full objective in one or two sentences'}},['objective'],'mission',el)].filter(t=>!(inMission&&t.name==='start_mission'));
+const parseActs=t=>{const re=/<<act\s*(\{[\s\S]*?\})\s*>>/g,o=[];let m;while((m=re.exec(t))){try{const j=JSON.parse(m[1]);if(j&&j.tool)o.push(j)}catch(e){}}return o};
+
+/* ---------- abilities ---------- */
+const webOK=()=>!HOSTED&&S.web!==false;
+const relayOK=()=>webOK()&&!!S.relay;
+const rbase=()=>String(S.relay).replace(/\/+$/,'');
+const enc=encodeURIComponent;
+async function getJSON(u,ms=20000){const c=new AbortController(),tm=setTimeout(()=>c.abort(),ms);
+  try{const r=await fetch(u,{signal:c.signal});const j=await r.json().catch(()=>null);if(!r.ok)throw new Error((j&&j.error&&j.error.message)||('the service answered with status '+r.status));return j||{}}
+  catch(e){throw new Error(e.name==='AbortError'?'the request timed out':(e.message||'network error'))}finally{clearTimeout(tm)}}
+function runWorker(code,ms=5000){return new Promise(res=>{
+  const src='for(const k of ["fetch","XMLHttpRequest","WebSocket","EventSource","indexedDB","caches","importScripts","BroadcastChannel","Worker","SharedWorker"]){try{Object.defineProperty(self,k,{value:undefined,writable:false,configurable:false})}catch(e){}}try{Object.defineProperty(self.navigator,"sendBeacon",{value:undefined})}catch(e){}const __o=[];const __f=x=>{try{return typeof x==="string"?x:JSON.stringify(x)}catch(e){return String(x)}};const console={log:(...a)=>__o.push(a.map(__f).join(" ")),info:(...a)=>__o.push(a.map(__f).join(" ")),warn:(...a)=>__o.push(a.map(__f).join(" ")),error:(...a)=>__o.push(a.map(__f).join(" "))};(async()=>{try{const __r=await(async()=>{\n'+code+'\n})();postMessage({ok:1,out:__o,res:__r===undefined?null:__f(__r)})}catch(e){postMessage({ok:0,out:__o,err:String(e)})}})()';
+  let w,u;try{u=URL.createObjectURL(new Blob([src],{type:'text/javascript'}));w=new Worker(u)}catch(e){return res('Code execution is not available in this view.')}
+  const done=t=>{clearTimeout(tm);try{w.terminate();URL.revokeObjectURL(u)}catch(e){}res(String(t).slice(0,4000))};
+  const tm=setTimeout(()=>done('Stopped: the code ran longer than '+ms/1000+' seconds.'),ms);
+  w.onmessage=e=>{const d=e.data||{};done([...(d.out||[]),d.ok?(d.res!=null?'=> '+d.res:''):'Error: '+d.err].filter(Boolean).join('\n')||'(finished with no output)')};
+  w.onerror=e=>{e.preventDefault&&e.preventDefault();done('Error: '+(e.message||'the code could not be parsed'))}})}
+
+let DOCS=[];try{DOCS=JSON.parse(localStorage.getItem(KEY+'.docs')||'[]')}catch(e){}
+if(!Array.isArray(DOCS))DOCS=[];
+function saveDocs(){try{localStorage.setItem(KEY+'.docs',JSON.stringify(DOCS));return true}catch(e){toast('The Library is full. Delete a document to make room.');return false}}
+function addDoc(title,text,src){title=String(title||'Untitled').replace(/\s+/g,' ').trim().slice(0,80)||'Untitled';text=String(text||'').slice(0,400000);
+  const i=DOCS.findIndex(d=>d.title.toLowerCase()===title.toLowerCase()),d={title,text,src,t:Date.now()};if(i>=0)DOCS[i]=d;else DOCS.push(d);saveDocs();renderDocs();return d}
+const findDoc=t=>{t=String(t||'').toLowerCase().trim();return t?(DOCS.find(d=>d.title.toLowerCase()===t)||DOCS.find(d=>d.title.toLowerCase().includes(t))):null};
+function searchDocs(q){const terms=String(q).toLowerCase().match(/[a-z0-9À-￿]{3,}/g)||[],hits=[];
+  for(const d of DOCS)for(let i=0;i<d.text.length;i+=700){const ch=d.text.slice(i,i+900),lc=ch.toLowerCase();let sc=0;for(const t of terms){let k=-1;while((k=lc.indexOf(t,k+1))>=0)sc++}if(sc)hits.push({sc,t:d.title,ch})}
+  return hits.sort((a,b)=>b.sc-a.sc).slice(0,4)}
+const kb=n=>n<1000?n+' ch':n<1e6?(n/1000).toFixed(n<10000?1:0)+'k':(n/1e6).toFixed(1)+'M';
+function renderDocs(){const ul=$('#docs');if(!ul)return;
+  ul.innerHTML=DOCS.map((d,i)=>`<li><button class="dl" data-doc="${i}" type="button" title="${esc(d.title)}">${esc(d.title)}</button><small>${kb(d.text.length)}</small><button class="x" data-ddel="${i}" aria-label="Delete document">✕</button></li>`).join('')||'<li class="empty" style="border:0">nothing yet</li>';
+  $('#n-dc').textContent=DOCS.length||''}
+let docOpen=-1;
+function openDoc(i){const d=DOCS[i];if(!d)return;docOpen=i;$('#doct').textContent=d.title;$('#docb').innerHTML=md(d.text.slice(0,120000));$('#docdl').hidden=HOSTED&&!CAP.dl;$('#doc').showModal()}
+function docChip(el,title){if(!el||!el.querySelector('.acts'))return;const b=document.createElement('button');b.type='button';b.className='act';b.textContent='DOCUMENT ▸ '+title.slice(0,50);b.dataset.doctitle=title;el.querySelector('.acts').append(b)}
+function addFiles(files){[...files].forEach(f=>{
+  if(f.type.startsWith('image/')){const r=new FileReader();r.onload=()=>addImage(r.result);r.readAsDataURL(f);return}
+  if(f.size>2e6)return toast(f.name+' is too large for the Library (2 MB limit).');
+  if(/\.(pdf|docx?|xlsx?|pptx?|zip|png|jpe?g|gif|mp[34]|wav)$/i.test(f.name))return toast(f.name+': only text files can be read here (txt, md, csv, json, code).');
+  const r=new FileReader();r.onload=()=>{if(/\u0000/.test(String(r.result).slice(0,2000)))return toast(f.name+' is not a text file.');addDoc(f.name,r.result,'upload');toast('Added to the Library: '+f.name)};r.readAsText(f)})}
+function notify(body){try{if(!HOSTED&&'Notification'in window&&Notification.permission==='granted')new Notification(S.name,{body})}catch(e){}}
+function askNotify(){try{if(!HOSTED&&'Notification'in window&&Notification.permission==='default'){const p=Notification.requestPermission();p&&p.catch&&p.catch(()=>{})}}catch(e){}}
+
+const WMO={0:'clear sky',1:'mainly clear',2:'partly cloudy',3:'overcast',45:'fog',48:'rime fog',51:'light drizzle',53:'drizzle',55:'heavy drizzle',61:'light rain',63:'rain',65:'heavy rain',66:'freezing rain',67:'heavy freezing rain',71:'light snow',73:'snow',75:'heavy snow',77:'snow grains',80:'light showers',81:'showers',82:'violent showers',85:'snow showers',86:'heavy snow showers',95:'thunderstorm',96:'thunderstorm with hail',99:'severe thunderstorm with hail'};
+const RUN={
+  reminder(a,el){const m=String(a.time||'').trim().match(/^(\d{1,2})(?:[:.h](\d{2}))?\s*(am|pm)?$/i);if(!m)return'Give the time as HH:MM, for example 14:30.';
+    let h=+m[1];const mi=+(m[2]||0);if(m[3]){h=h%12+(/pm/i.test(m[3])?12:0)}if(h>23||mi>59)return'That is not a valid time.';
+    const d=new Date();d.setHours(h,mi,0,0);if(d<=new Date())d.setDate(d.getDate()+1);
+    act({tool:'timer',seconds:Math.round((d-Date.now())/1000),label:String(a.label||'reminder')},el);return'Reminder set for '+d.toLocaleString([], {weekday:'short',hour:'2-digit',minute:'2-digit'})+'.'},
+  async search(a,el){const q=String(a.query||'').trim();if(!q)return'No search text given.';chip(el,'SEARCH ▸ '+q.slice(0,60));
+    const j=await getJSON(rbase()+'/search?q='+enc(q));const rs=j.results||[];if(!rs.length)return'No results found.';
+    rs.slice(0,3).forEach(r=>{try{chip(el,'↗ '+new URL(r.url).host.replace(/^www\./,''),r.url)}catch(e){}});
+    return rs.map((r,i)=>`${i+1}. ${r.title}\n${r.url}\n${r.snippet||''}`).join('\n\n')},
+  async read(a,el){let u;try{u=new URL(String(a.url||''))}catch(e){return'That is not a valid address.'}if(!/^https?:$/.test(u.protocol))return'Only http and https pages can be read.';
+    chip(el,'READ ↗ '+u.host.replace(/^www\./,''),u.href);const j=await getJSON(rbase()+'/read?url='+enc(u.href));
+    return(j.title?j.title+'\n\n':'')+(j.text||'(the page had no readable text)')+(j.truncated?'\n\n[The page continues beyond this point.]':'')},
+  async wiki(a,el){const q=String(a.query||'').trim();if(!q)return'No topic given.';chip(el,'ENCYCLOPEDIA ▸ '+q.slice(0,50));
+    const j=await getJSON('https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrlimit=1&prop=extracts%7Cinfo&exintro=1&explaintext=1&inprop=url&format=json&origin=*&gsrsearch='+enc(q));
+    const p=j.query&&j.query.pages&&Object.values(j.query.pages)[0];if(!p)return'No article found.';
+    if(p.fullurl)chip(el,'↗ wikipedia.org',p.fullurl);return p.title+'\n\n'+String(p.extract||'').slice(0,3000)+(p.fullurl?'\n\nSource: '+p.fullurl:'')},
+  async weather(a,el){const q=String(a.place||'').trim();if(!q)return'No place given.';chip(el,'WEATHER ▸ '+q.slice(0,40));
+    const g=await getJSON('https://geocoding-api.open-meteo.com/v1/search?count=1&name='+enc(q));const l=g.results&&g.results[0];if(!l)return'That place was not found.';
+    const f=await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${l.latitude}&longitude=${l.longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=3&timezone=auto`);
+    const c=f.current||{},d=f.daily||{},w=k=>WMO[k]||'unsettled';
+    return`${l.name}${l.country?', '+l.country:''} now: ${c.temperature_2m}°C (feels ${c.apparent_temperature}°C), ${w(c.weather_code)}, humidity ${c.relative_humidity_2m}%, wind ${c.wind_speed_10m} km/h.\n`+(d.time||[]).map((t,i)=>`${t}: ${w(d.weather_code[i])}, ${d.temperature_2m_min[i]}–${d.temperature_2m_max[i]}°C, rain chance ${d.precipitation_probability_max[i]}%`).join('\n')},
+  time(a){try{return new Date().toLocaleString('en-GB',{timeZone:String(a.zone||'UTC').trim(),dateStyle:'full',timeStyle:'short'})+' ('+String(a.zone||'UTC').trim()+')'}catch(e){return'Unknown time zone. Use an IANA name such as Europe/Paris or Asia/Tokyo.'}},
+  async calc(a,el){const x=String(a.expression||'').trim();if(!x||x.length>300||!/^[\w\s+\-*/%^().,<>=!&|?:\[\]]+$/.test(x))return'That expression cannot be evaluated. Use numbers, operators and Math functions only.';
+    const r=await runWorker('with(Math){return ('+x.replace(/\^/g,'**')+')}',2000);chip(el,'CALC ▸ '+x.slice(0,40)+' '+r.slice(0,30));return r},
+  async code(a,el){const c=String(a.code||'');if(!c.trim())return'No code given.';chip(el,'CODE ▸ ran '+c.split('\n').length+' line'+(c.split('\n').length>1?'s':''));return runWorker(c)},
+  doc_save(a,el){const t=String(a.title||'').trim(),c=String(a.content||a.text||'');if(!t||!c.trim())return'A title and content are both needed.';const d=addDoc(t,c,'vega');el&&docChip(el,d.title);return`Saved "${d.title}" to the Library (${d.text.length} characters).`},
+  doc_list(){return DOCS.length?DOCS.map(d=>`- ${d.title} (${d.text.length} characters${d.src==='vega'?', written by you':', added by the user'})`).join('\n'):'The Library is empty.'},
+  doc_read(a,el){const d=findDoc(a.title);if(!d)return'No document matches that title. Library: '+(DOCS.map(d=>d.title).join('; ')||'empty');const n=Math.max(1,Math.round(+a.part||1)),tot=Math.max(1,Math.ceil(d.text.length/12000));
+    el&&chip(el,'LIBRARY ▸ '+d.title.slice(0,40));return`${d.title} (part ${Math.min(n,tot)} of ${tot})\n\n`+d.text.slice((Math.min(n,tot)-1)*12000,Math.min(n,tot)*12000)},
+  doc_find(a,el){const q=String(a.query||'').trim();if(!q)return'No search text given.';el&&chip(el,'LIBRARY ▸ search: '+q.slice(0,40));const h=searchDocs(q);return h.length?h.map(x=>`From "${x.t}":\n${x.ch}`).join('\n\n---\n\n'):'Nothing in the Library matches that.'}
+};
+const str={type:'string'},num={type:'number'};
+const AB=[
+  {id:'timer',name:'set_timer',d:'Start a countdown timer on the deck.',p:{seconds:num,label:str},r:['seconds']},
+  {id:'reminder',name:'set_reminder',d:'Set a reminder for a clock time, today or tomorrow if that time has passed.',p:{time:{type:'string',description:'24-hour HH:MM'},label:str},r:['time']},
+  {id:'task',name:'add_task',d:'Add a task to the task list.',p:{text:str}},
+  {id:'done',name:'complete_task',d:'Mark an open task done by matching part of its text.',p:{text:str}},
+  {id:'note',name:'add_note',d:'Save a short note.',p:{text:str}},
+  {id:'remember',name:'remember',d:'Store a durable fact about the user in long-term memory (preferences, names, routines).',p:{text:str}},
+  {id:'forget',name:'forget',d:'Remove long-term memories containing the given text.',p:{text:str}},
+  {id:'open',name:'offer_link',d:'Show the user a button that opens an https address in a new tab.',p:{url:str}},
+  {id:'mission',name:'start_mission',d:'Hand a substantial multi-step objective (research, a plan, a design, a comparison, a long document) to the mission planner, which works through it step by step on screen. After calling it, say in one sentence that you are starting and do not do the work in that reply.',p:{objective:str},ok:()=>!inMission},
+  {id:'search',name:'web_search',info:1,ok:relayOK,d:'Search the web for current or factual information. Returns up to 6 results with title, address and snippet.',p:{query:str}},
+  {id:'read',name:'read_page',info:1,ok:relayOK,d:'Fetch a web page and return its readable text (first 12,000 characters).',p:{url:str}},
+  {id:'wiki',name:'encyclopedia',info:1,ok:webOK,d:'Look up a topic on Wikipedia and return the article summary.',p:{query:str}},
+  {id:'weather',name:'weather',info:1,ok:webOK,d:'Current weather and a 3-day forecast for a place.',p:{place:str}},
+  {id:'time',name:'world_time',info:1,d:'Current date and time in an IANA time zone such as Asia/Tokyo.',p:{zone:str}},
+  {id:'calc',name:'calculate',info:1,d:'Evaluate a math expression exactly. Supports + - * / % ^ and Math functions such as sqrt, sin, log, pow, PI.',p:{expression:str}},
+  {id:'code',name:'run_code',info:1,d:'Run JavaScript in a sandbox (no network, no page access, 5 second limit) for calculations, simulations and data processing. Use console.log or return a value.',p:{code:str}},
+  {id:'doc_save',name:'save_document',d:'Save a document (report, plan, draft, code) to the user\'s Library, replacing any with the same title. Use it for long deliverables.',p:{title:str,content:str}},
+  {id:'doc_list',name:'list_documents',info:1,d:'List the documents in the Library.',p:{}},
+  {id:'doc_read',name:'read_document',info:1,d:'Read a Library document by title. part selects a 12,000-character section, starting at 1.',p:{title:str,part:num},r:['title']},
+  {id:'doc_find',name:'search_documents',info:1,d:'Search inside all Library documents for a phrase or keywords and return the best matching passages.',p:{query:str}}
+];
+const toolset=()=>AB.filter(t=>!t.ok||t.ok());
+const runTool=(t,a,el)=>RUN[t.id]?RUN[t.id](a,el):act({...a,tool:t.id},el);
+const sampleTools=(tl,el)=>tl.map(t=>({name:t.name,description:t.d+' Returns text.',inputSchema:{type:'object',properties:t.p||{},required:t.r||Object.keys(t.p||{})},
+  execute:async i=>{try{return String(await runTool(t,i||{},el)).slice(0,14000)}catch(e){return'That did not work: '+(e&&e.message||e)}}}));
+const join2=(a,b)=>a&&b?a+'\n\n'+b:a||b;
+async function agent(msgs,el,show,o={}){
+  const tl=toolset(),cl=engine()==='claude',t0=performance.now();let t1=0,vis='';
+  const on=full=>{if(!t1){t1=performance.now();if(cl){lats.push(Math.round(t1-t0));if(lats.length>40)lats.shift();setLink()}}
+    const dt=(performance.now()-t1)/1000;if(dt>.3){const v=Math.round(full.length/4/dt);$('#tps').textContent=v;dial('d-tps',v/150)}
+    if(show){const t=join2(vis,clean(full));el._raw=t;setBody(el,t||'…');scroll()}};
+  if(cl){const r=await llm(msgs,on,ctl.signal,{tools:sampleTools(tl,el),imgs:o.imgs});sessTok+=Math.round(r.text.length/4);return{text:clean(r.text),truncated:r.truncated}}
+  let m=msgs;
+  for(let round=0;round<5;round++){t1=0;
+    const r=await llm(m,on,ctl.signal);sessTok+=Math.round(r.text.length/4);
+    const raw=stripThink(r.text),calls=parseActs(raw);vis=join2(vis,clean(raw));if(show){el._raw=vis;setBody(el,vis||'…')}
+    if(!calls.length)break;
+    const out=[];let info=false;
+    for(const c of calls.slice(0,4)){const t=tl.find(t=>t.id===c.tool||t.name===c.tool);let res;
+      if(!t)res='That tool is not available here.';else{try{res=await runTool(t,c,el)}catch(x){res='That did not work: '+(x&&x.message||x)}if(t.info)info=true}
+      out.push('['+c.tool+'] '+String(res).slice(0,7000));if(ctl.signal.aborted)throw{name:'AbortError'}}
+    if(!info||round===4)break;
+    m=[...m,{role:'assistant',content:raw||'(using tools)'},{role:'user',content:'[Tool results]\n'+out.join('\n\n')+'\n\nUse these results to answer the request. Call another tool only if it is essential. Do not repeat what you already said.'}]}
+  return{text:vis,truncated:false}}
 
 /* ---------- conversation ---------- */
 const ICON={go:'<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',stop:'<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10"/></svg>'};
 function setBusy(b){busy=b;$('#go').innerHTML=b?ICON.stop:ICON.go;$('#go').title=b?'Stop':'Send'}
 function stop(){ctl&&ctl.abort();stopSpeak()}
-async function stream(msgs,el,o){
-  const t0=performance.now();let t1=0;
-  const r=await llm(msgs,full=>{if(!t1){t1=performance.now();if(engine()==='claude'){lats.push(Math.round(t1-t0));if(lats.length>40)lats.shift();setLink()}}
-    el._raw=full;setBody(el,clean(full)||'…');const dt=(performance.now()-t1)/1000;if(dt>.3){const v=Math.round(full.length/4/dt);$('#tps').textContent=v;dial('d-tps',v/150)}scroll()},ctl.signal,o);
-  sessTok+=Math.round(r.text.length/4);return r}
 const aborted=e=>(ctl&&ctl.signal.aborted)||(e&&(e.name==='AbortError'||e.code==='aborted'||e.code==='cancelled'));
 async function ensureEngine(){if(!capsDone)await capsReady;if(!engine()&&!HOSTED)await probe();return engine()}
 async function reply(imgs){
   const ep=epoch;setBusy(true);const my=ctl=new AbortController();setState('thinking');
   const el=addMsg('ai','…',{tag:S.mode==='concierge'||inMission?'':MODES[S.mode].n});el.classList.add('live');let full='',trunc=false,err=null;
   try{if(!await ensureEngine())throw{code:'no_engine'};
-    const r=await stream(buildMsgs(imgs),el,{tools:TOOLS(el),imgs});full=r.text;trunc=r.truncated}
+    const r=await agent(buildMsgs(imgs),el,true,{imgs});full=r.text;trunc=r.truncated}
   catch(e){if(my.signal.aborted||aborted(e))full=el._raw||(e&&e.text)||'';else err=e}
   const cut=my.signal.aborted;
   if(ep!==epoch){pendingMission=null;setBusy(false);if(orb.state==='thinking')setState('idle');return}
   el.classList.remove('live');
   if(err){el.remove();fail(err)}
-  else{const shown=clean(full);if(engine()!=='claude'&&!cut)runActs(stripThink(full),el);
+  else{const shown=clean(full);
     if(!shown&&!el.querySelector('.act'))el.remove();
     else{setBody(el,shown||'Done.');el._t=shown||'Done.';if(trunc)chip(el,'ANSWER CUT SHORT');if(cut)chip(el,'STOPPED');tools(el);
-      S.history.push({role:'assistant',content:engine()==='claude'?(shown||'Done.'):stripThink(full).trim(),t:Date.now()});if(!cut)speak(shown)}}
+      S.history.push({role:'assistant',content:shown||'Done.',t:Date.now()});if(!cut)speak(shown)}}
   save();setBusy(false);if(orb.state==='thinking')setState('idle');home();stats();
   if(pendingMission){const o=pendingMission;pendingMission=null;if(!err&&!cut&&!inMission)mission(o)}}
 function fail(e){
@@ -615,10 +737,10 @@ async function mission(obj){
   inMission=true;pendingMission=null;setMode('auto');setBusy(true);ctl=new AbortController();setState('thinking');
   const card=addMsg('ai','**Mission** · '+obj,{tag:'Mission'});
   const ol=document.createElement('ol');ol.className='steps';card.querySelector('.body').after(ol);
-  const ask=async q=>clean((await llm([{role:'system',content:sysPrompt()},{role:'user',content:q}],null,ctl.signal)).text);
+  const sys=()=>({role:'system',content:sysPrompt()}),plain=async q=>clean((await llm([sys(),{role:'user',content:q}],null,ctl.signal)).text),ask=async q=>(await agent([sys(),{role:'user',content:q}],card,false)).text;
   try{
     if(!await ensureEngine())throw{code:'no_engine'};
-    const plan=await ask(`Objective: ${obj}\n\nBreak this into 2 to 5 concrete steps that you can complete yourself by reasoning and writing alone. Reply with only a numbered list, one short line per step.`);
+    const plan=await plain(`Objective: ${obj}\n\nBreak this into 2 to 5 concrete steps that you can complete yourself with your tools and your own reasoning. Reply with only a numbered list, one short line per step. Do not call any tool in this reply.`);
     const steps=plan.split('\n').map(l=>l.replace(/^\s*(?:\d+[.)]|[-*•])\s*/,'').replace(/\*\*/g,'').trim()).filter(Boolean).slice(0,5);
     if(!steps.length)throw new Error('no plan came back');
     ol.innerHTML=steps.map(s=>`<li>${esc(s)}</li>`).join('');scroll();
@@ -626,9 +748,10 @@ async function mission(obj){
     for(let i=0;i<steps.length;i++){
       const li=ol.children[i];li.className='run';
       const r=await ask(`Objective: ${obj}\n\nWork completed so far:\n${res.map((x,j)=>`Step ${j+1} (${steps[j]}): ${x}`).join('\n\n')||'(nothing yet)'}\n\nNow carry out step ${i+1}: ${steps[i]}\nGive only the result of this step, concisely.`);
-      res.push(r);sessTok+=Math.round(r.length/4);li.className='ok';li.insertAdjacentHTML('beforeend',`<details><summary>RESULT</summary>${md(r)}</details>`);scroll()}
+      res.push(r);li.className='ok';li.insertAdjacentHTML('beforeend',`<details><summary>RESULT</summary>${md(r)}</details>`);scroll()}
     S.history.push({role:'user',content:`[Mission results]\n${res.map((x,j)=>`${steps[j]}: ${x}`).join('\n\n')}\n\nGive me the final deliverable for the objective "${obj}", then a one-line summary of what was done.`,t:Date.now(),hidden:true});
-    setBusy(false);await reply()
+    setBusy(false);const ep=epoch;await reply();
+    const fin=S.history[S.history.length-1];if(ep===epoch&&fin&&fin.role==='assistant'&&fin.content.length>500){const d=addDoc(obj,fin.content,'vega');const le=log.lastElementChild;if(le&&le.classList.contains('ai'))docChip(le,d.title)}
   }catch(e){setBusy(false);setState('idle');if(aborted(e))chip(card,'STOPPED');else fail(e)}
   inMission=false;pendingMission=null;save()}
 function send(text){
@@ -640,16 +763,17 @@ function send(text){
 function slash(t){
   const[,c,a='']=t.match(/^\/(\w+)\s*([\s\S]*)/)||[];if(!c)return false;const arg=a.trim();
   switch(c){
-    case'timer':{const d=splitDur(arg);if(!d.s){toast('Try: /timer 5m tea');break}act({tool:'timer',seconds:d.s,label:d.label||'timer'});break}
+    case'timer':{askNotify();const d=splitDur(arg);if(!d.s){toast('Try: /timer 5m tea');break}act({tool:'timer',seconds:d.s,label:d.label||'timer'});break}
     case'task':case'note':case'remember':if(arg)act({tool:c,text:arg});break;
     case'mission':if(arg){addMsg('user',arg);S.history.push({role:'user',content:arg,t:Date.now()});mission(arg)}break;
     case'clear':clearChat();break;case'export':exportData();break;
     case'help':help();break;
     default:return false}
   inp.value='';grow();return true}
-function help(){addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space)':''}, and read replies aloud.\n- Run timers, keep tasks and notes, and remember facts about you between sessions. Just ask in plain words.\n- Look at images you attach or paste.\n- Adapt to the task on my own: quick conversation, status briefings, image analysis, hands-on steps, or deep reasoning. The label at the top shows which.\n- Take a big objective, plan it and work it step by step. I start a mission myself when a request calls for one, or you can force it with \`/mission your objective\`.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/clear\` · \`/export\`\n\nI cannot browse the web, read your files or control devices from here.`)}
+function help(){const web=relayOK()?'- **Search the web and read pages** for current facts, and cite where they came from.\n':'',facts=webOK()?'- Look things up in the **encyclopedia** and check the **weather** anywhere.\n':'';
+  addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space when not typing)':''}, and read replies aloud.\n${web}${facts}- **Calculate exactly** and **run code** in a sandbox for analysis and simulations.\n- Keep a **Library**: add text files and I can read and search them; long work I produce is saved there for you to copy or download.\n- Run **timers and clock-time reminders**, keep **tasks and notes**, and **remember** facts about you between sessions.\n- Look at **images** you attach or paste.\n- Take a big objective, plan it, and work it step by step with my tools. I start a mission myself when a request calls for one, or use \`/mission your objective\`.\n\nI choose my approach for each request; the label at the top shows which.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/mission objective\` · \`/clear\` · \`/export\`\n\n${HOSTED?'In this hosted view I cannot reach the internet. ':relayOK()?'':'Web search needs a relay address in Settings. '}I cannot control other apps or devices.`)}
 function clearChat(){epoch++;stop();pendingMission=null;S.history=[];save();log.innerHTML='';home();stats();hello()}
-async function exportData(){const data=JSON.stringify({...S,key:undefined},null,2),fn=S.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-export.json';
+async function exportData(){const data=JSON.stringify({...S,key:undefined,library:DOCS},null,2),fn=S.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-export.json';
   if(CAP.dl){try{await CAP.dl.save({filename:fn,data});toast('Export saved.')}catch(e){if(!e||e.code!=='declined')toast('The export could not be saved here.')}return}
   if(HOSTED)return toast('Saving files is not available in this view.');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
@@ -660,11 +784,12 @@ function hello(){
   $('#hp').textContent=e?`${S.name} is online. ${st}.`:capsDone?(HOSTED?'Claude is not available to this page in this view.':(needsKey()?`Add your OpenRouter key in Settings to bring ${S.name} online.`:`No model connected yet. Point ${S.name} at your model to begin.`)):'Bringing systems online…';
   const sg=[];
   if(capsDone&&!e&&!HOSTED)sg.push([needsKey()?'Add your key':'Connect your model','set',1]);
-  sg.push(['Brief me','brief'],['25 minute focus timer','focus'],['Plan a mission','mission'],['What can you do?','help']);
+  sg.push(['Brief me','brief'],relayOK()?['Search the web','web']:['25 minute focus timer','focus'],['Plan a mission','mission'],['What can you do?','help']);
   $('#sugg').innerHTML=sg.map(([t,a,p])=>`<button class="sg${p?' pri':''}" data-s="${a}" type="button">${t}</button>`).join('')}
 $('#sugg').addEventListener('click',e=>{const b=e.target.closest('[data-s]');if(!b)return;const a=b.dataset.s;
   if(a==='set')openSet();else if(a==='help')help();
   else if(a==='focus')act({tool:'timer',seconds:1500,label:'focus'});
+  else if(a==='web'){inp.value='Search the web for ';inp.focus()}
   else if(a==='mission'){inp.value='/mission ';inp.focus()}
   else send('Give me a short briefing: the time of day, my open tasks, running timers, recent notes, and what I should focus on next.')});
 
@@ -679,9 +804,10 @@ function renderTimers(){
 function tickTimers(){const n=$$('#timers .timer');if(n.length!==S.timers.length)return renderTimers();
   S.timers.forEach((t,i)=>{const left=(t.end-Date.now())/1000,f=left<=0;n[i].classList.toggle('fin',f);n[i].querySelector('b').textContent=f?'DONE':dur(left);n[i].querySelector('.v').setAttribute('stroke-dasharray',(81.68*(f?1:Math.max(0,1-left/t.total))).toFixed(1)+' 81.68')})}
 function beep(){try{const A=window.AudioContext||window.webkitAudioContext,a=new A(),g=a.createGain();g.gain.value=.08;g.connect(a.destination);[0,.22,.44].forEach(d=>{const o=a.createOscillator();o.frequency.value=880;o.connect(g);o.start(a.currentTime+d);o.stop(a.currentTime+d+.12)});setTimeout(()=>a.close().catch(()=>{}),1200)}catch(e){}}
-$('#right').addEventListener('click',e=>{const d=e.target.closest('[data-del]'),t=e.target.closest('[data-tog]');
+$('#right').addEventListener('click',e=>{const od=e.target.closest('[data-doc]'),dd=e.target.closest('[data-ddel]');if(od)return openDoc(+od.dataset.doc);if(dd){DOCS.splice(+dd.dataset.ddel,1);saveDocs();renderDocs();stats();return}
+  const d=e.target.closest('[data-del]'),t=e.target.closest('[data-tog]');
   if(d){const[k,i]=d.dataset.del.split(':');S[k].splice(+i,1)}else if(t){const x=S.tasks[+t.dataset.tog];x.done=!x.done}else return;save();renderOps()});
-$$('form.add').forEach(f=>f.addEventListener('submit',e=>{e.preventDefault();const i=f.querySelector('input'),v=i.value.trim();if(!v)return;
+$$('form.add').forEach(f=>f.addEventListener('submit',e=>{e.preventDefault();if(f.dataset.add==='timer')askNotify();const i=f.querySelector('input'),v=i.value.trim();if(!v)return;
   if(f.dataset.add==='timer'){const d=splitDur(v);if(!d.s)return toast('Try: 5m tea');act({tool:'timer',seconds:d.s,label:d.label||'timer'})}else act({tool:f.dataset.add,text:v});i.value=''}));
 
 /* ---------- telemetry ---------- */
@@ -701,11 +827,12 @@ function stats(){
   $('#s-tts').textContent=!S.speak?'muted':CAP.tts?'Claude voice':hasSynth?'system voice':'text only';
   $('#s-stt').textContent=CAP.dict?'dictation':HOSTED?'typing only':S.stt==='local'?'local whisper':SR?'browser':'typing only';
   $('#s-vis').textContent=engine()==='claude'?(CAP.img?'images':'off'):'images + camera';
+  $('#s-web').textContent=HOSTED?'not in this view':!webOK()?'off':S.relay?'search · pages · facts':'facts · weather';$('#s-code').textContent='sandbox · calculator';
   $('#s-wake').textContent=S.wake&&SR?'armed · "'+S.name+'"':'off';
   $('#mic').hidden=!micOK();$('#bcam').hidden=HOSTED;$('#att').hidden=HOSTED&&capsDone&&!CAP.img}
 setInterval(()=>{
   $('#clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  let fired=false;S.timers.forEach(t=>{if(!t.fired&&Date.now()>=t.end){t.fired=fired=true;beep();toast('Timer complete · '+t.label);speak(`Timer complete: ${t.label}.`)}});if(fired)save();
+  let fired=false;S.timers.forEach(t=>{if(!t.fired&&Date.now()>=t.end){t.fired=fired=true;beep();toast('Timer complete · '+t.label);notify('Timer complete: '+t.label);speak(`Timer complete: ${t.label}.`)}});if(fired)save();
   if(S.timers.length)tickTimers()},500);
 setInterval(stats,2000);
 if(!HOSTED){setInterval(()=>{if(!busy&&online)probe()},15000);addEventListener('focus',()=>{if(!online&&!busy)probe()})}
@@ -856,15 +983,15 @@ function palRun(i){const c=pf[i];$('#pal').close();c&&c.f()}
 $('#pq').addEventListener('input',()=>{pi=0;palRender()});
 $('#pq').addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();pi=(pi+(e.key==='ArrowDown'?1:-1)+pf.length)%Math.max(1,pf.length);palRender();const s=$('#pl .sel');s&&s.scrollIntoView({block:'nearest'})}else if(e.key==='Enter'){e.preventDefault();palRun(pi)}});
 $('#pl').addEventListener('click',e=>{const li=e.target.closest('[data-i]');li&&palRun(+li.dataset.i)});
-function openSet(){$('#eng-h').hidden=!HOSTED;$('#eng-l').hidden=HOSTED;$('#stt-l').hidden=HOSTED;$('#exp').hidden=HOSTED&&!CAP.dl;
+function openSet(){$('#eng-h').hidden=!HOSTED;$('#eng-l').hidden=HOSTED;$('#stt-l').hidden=HOSTED;$('#web-l').hidden=HOSTED;$('#exp').hidden=HOSTED&&!CAP.dl;
   fillVoices();fillModels();$$('[data-k]').forEach(i=>{const v=S[i.dataset.k];if(i.type==='checkbox')i.checked=!!v;else if(i.id!=='vsel'&&i.id!=='msel')i.value=v});
   $('#testr').textContent='';$('#wipe').textContent='Erase everything';$('#set').showModal()}
 $('#set').addEventListener('change',e=>{const i=e.target.closest('[data-k]');if(!i)return;const k=i.dataset.k;S[k]=i.type==='checkbox'?i.checked:i.type==='number'||i.type==='range'?+i.value:i.value.trim();
-  if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){S.wake?armWake():wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
+  if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){S.wake?armWake():wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
   if(k==='rate'&&CAP.tts)CAP.tts.setRate(S.rate).catch(()=>{});save();setLink();stats()});
 $('#test').onclick=async()=>{const r=$('#testr');r.textContent='testing…';r.style.color='var(--dim)';const ok=await probe();r.textContent=ok?`ready · ${models.length} model${models.length===1?'':'s'} · ${lats[lats.length-1]} ms`:'no answer. Is the server running, with CORS allowed?';r.style.color=ok?'var(--ok)':'var(--amber)'};
 $('#exp').onclick=exportData;$('#clr').onclick=()=>{clearChat();$('#set').close()};
-let wipeArm=0;$('#wipe').onclick=e=>{if(Date.now()-wipeArm<4000){epoch++;stop();pendingMission=null;try{localStorage.removeItem(KEY)}catch(x){}S={...DEF,...VD,tasks:[],notes:[],memory:[],timers:[],history:[]};$('#set').close();applyName();setMode('concierge');try{localStorage.removeItem(KEY)}catch(x){}log.innerHTML='';home();renderOps();stats();probe();toast('Everything erased.')}else{wipeArm=Date.now();e.target.textContent='Press again to erase'}};
+let wipeArm=0;$('#wipe').onclick=e=>{if(Date.now()-wipeArm<4000){epoch++;stop();pendingMission=null;try{localStorage.removeItem(KEY)}catch(x){}S={...DEF,...VD,tasks:[],notes:[],memory:[],timers:[],history:[]};DOCS=[];try{localStorage.removeItem(KEY+'.docs')}catch(x){}renderDocs();$('#set').close();applyName();setMode('concierge');try{localStorage.removeItem(KEY)}catch(x){}log.innerHTML='';home();renderOps();stats();probe();toast('Everything erased.')}else{wipeArm=Date.now();e.target.textContent='Press again to erase'}};
 $$('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 $$('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 function applyName(){$('#nm').textContent=S.name.toUpperCase()}
@@ -874,7 +1001,15 @@ let camStream=null;
 function renderPend(){$('#pend').innerHTML=pending.map((u,i)=>`<img src="${u}" data-i="${i}" title="Remove" alt="pending attachment">`).join('')}
 $('#pend').addEventListener('click',e=>{if(e.target.dataset.i){pending.splice(+e.target.dataset.i,1);renderPend()}});
 function addImage(src){if(pending.length>=4)return toast('Up to 4 images per message.');const im=new Image();im.onload=()=>{const k=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);pending.push(c.toDataURL('image/jpeg',.85));renderPend();inp.focus()};im.onerror=()=>toast('That image could not be read.');im.src=src}
-$('#file').onchange=e=>{[...e.target.files].forEach(f=>{const r=new FileReader();r.onload=()=>addImage(r.result);r.readAsDataURL(f)});e.target.value=''};
+$('#file').onchange=e=>{addFiles(e.target.files);e.target.value=''};
+$('#adddoc').onclick=()=>$('#file').click();
+addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault()});
+addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files.length){e.preventDefault();addFiles(e.dataTransfer.files)}});
+async function saveFile(fn,data,type){if(CAP.dl){try{await CAP.dl.save({filename:fn,data});toast('Saved.')}catch(x){if(!x||x.code!=='declined')toast('The file could not be saved here.')}return}
+  if(HOSTED)return toast('Saving files is not available in this view.');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:type||'text/plain'}));a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+$('#doccp').onclick=e=>{const d=DOCS[docOpen];d&&copyText(d.text,e.target)};
+$('#docdl').onclick=()=>{const d=DOCS[docOpen];d&&saveFile((d.title.replace(/[^\w.\- ]+/g,'').trim()||'document').replace(/\.(md|txt|csv|json)$/i,'')+'.md',d.text)};
+$('#docrm').onclick=()=>{if(docOpen>=0){DOCS.splice(docOpen,1);saveDocs();renderDocs();stats()}$('#doc').close()};
 $('#att').onclick=()=>$('#file').click();
 async function openCam(){if(HOSTED)return;try{camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});$('#cam video').srcObject=camStream;$('#cam').showModal()}catch(e){toast('Camera unavailable or permission denied.')}}
 $('#cam').addEventListener('close',()=>{camStream&&camStream.getTracks().forEach(t=>t.stop());camStream=null});
@@ -905,7 +1040,7 @@ if(innerWidth<600)inp.placeholder='Speak or type…';
 applyName();setMode('concierge');
 S.timers=S.timers.filter(t=>!t.fired);
 S.history.filter(m=>!m.hidden).slice(-60).forEach(m=>{const u=m.role==='user',el=addMsg(u?'user':'ai',u?m.content:clean(m.content),{t:m.t});if(m.img)chip(el,m.img+' image'+(m.img>1?'s':'')+' (not kept)');if(!u)tools(el)});
-home();renderOps();stats();fillVoices();
+home();renderOps();renderDocs();stats();fillVoices();
 if(!HOSTED)probe().then(()=>{stats();armWake()});
 booted=true;if(innerWidth>1080)inp.focus();
 </script>
