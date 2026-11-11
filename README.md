@@ -22,6 +22,13 @@ It also works with any OpenAI-style endpoint. For a fully private setup point it
   - **Exact calculation** and **sandboxed code** for analysis and simulations (no network or page access inside the sandbox).
   - **Library**: drop in text files and VEGA can read and search them; long work it writes is saved there to copy or download.
   - **Timers, clock-time reminders, tasks, notes and long-term memory.**
+- **Presence**: VEGA speaks as it thinks (sentence by sentence), answers simple commands instantly without a model call, and speaks up on its own: a daily arrival briefing, low power, a lost connection.
+- **Conversation mode**: hands-free back and forth. Say "conversation mode" to start and "that will be all" to end.
+- **Protocols**: named routines ("run the morning protocol"), which you can define in plain words and schedule daily.
+- **Displays**: charts, tables and weather panels put on screen alongside the answer, plus one-tap follow-up suggestions.
+- **Sentries**: ask it to keep an eye on a web page and it reports when the page changes (needs the relay, and the deck open).
+- **Screen awareness**: say "look at my screen" to share a capture with a vision-capable model.
+- **Resilience**: if a free model is busy, VEGA reroutes to another one on its own.
 - **Missions**: for a big objective VEGA plans it, works each step with its tools, delivers the result and files it in the Library. It starts one on its own, or use `/mission`.
 - **Voice**: hold Space to talk; replies can be read aloud. Optional wake word.
 - **Vision**: attach, paste or capture an image for a vision-capable model.
