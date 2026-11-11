@@ -399,11 +399,11 @@ const DEF={name:'VEGA',user:'',url:'http://localhost:11434/v1',key:'',model:'',t
   freeOnly:true,stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
 const VD=window.VEGA_DEFAULTS||{};
 let S={...DEF,...VD};
-try{S={...S,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch(e){}
-if(VD.key&&!S.key){S.url=VD.url||S.url;S.key=VD.key;S.model=''}
+let hadSaved=false;try{const raw=localStorage.getItem(KEY);hadSaved=raw!==null;S={...S,...JSON.parse(raw||'{}')}}catch(e){}
+if(VD.key&&!S.key&&(!hadSaved||S.url===VD.url)){S.url=VD.url||S.url;S.key=VD.key;S.model=''}
 ['tasks','notes','memory','timers','history'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({...S,history:S.history.slice(-200)}))}catch(e){}};
-let booted=false,inMission=false,pendingMission=null,online=false,models=[],priced=false,freeSet=new Set(),ctxMap={},busy=false,ctl=null,pending=[],sessTok=0,lats=[],boot=Date.now(),capsDone=!HOSTED;
+let epoch=0,lastImgs=[],booted=false,inMission=false,pendingMission=null,online=false,models=[],priced=false,freeSet=new Set(),ctxMap={},busy=false,ctl=null,pending=[],sessTok=0,lats=[],boot=Date.now(),capsDone=!HOSTED;
 const log=$('#log'),inp=$('#inp');
 const dial=(id,f)=>{const c=document.querySelector('#'+id+' .v');if(c)c.style.strokeDasharray=(150.8*Math.max(0,Math.min(1,f||0)))+' 201.1'};
 const needsKey=()=>/openrouter\.ai/i.test(S.url)&&!S.key;
@@ -414,6 +414,7 @@ let tT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on
 const hm=(d=new Date())=>d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 const dur=s=>{s=Math.max(0,Math.ceil(s));const h=s/3600|0,m=(s%3600)/60|0,x=s%60;return(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
 function parseDur(t){let s=0,m,any=false;const re=/(\d+(?:\.\d+)?)\s*(h|m|s)?/gi;while((m=re.exec(t))){any=true;s+=parseFloat(m[1])*({h:3600,m:60,s:1}[(m[2]||'m').toLowerCase()])}return any?Math.round(s):0}
+function splitDur(t){const m=String(t).match(/^\s*((?:\d+(?:\.\d+)?\s*(?:h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?|s(?:ec(?:ond)?s?)?)?\b\s*)+)/i);return m?{s:parseDur(m[1]),label:t.slice(m[0].length).trim()}:{s:0,label:''}}
 const stripThink=t=>t.replace(/<think>[\s\S]*?(<\/think>|$)/g,'');
 const clean=t=>stripThink(t).replace(/<<act[\s\S]*?(>>|$)/g,'').trim();
 function md(s){
@@ -439,6 +440,7 @@ const base=()=>S.url.replace(/\/+$/,'');
 const hdr=()=>({'Content-Type':'application/json',...(S.key?{Authorization:'Bearer '+S.key}:{})});
 async function probe(){
   if(HOSTED)return false;
+  if(needsKey()){online=false;fillModels();setLink();return false}
   const t0=performance.now();
   try{
     const c=new AbortController(),tm=setTimeout(()=>c.abort(),4000);
@@ -452,7 +454,7 @@ async function probe(){
     models=list.map(m=>m.id||m.name);
     lats.push(Math.round(performance.now()-t0));if(lats.length>40)lats.shift();online=true;
     if(models.length&&!models.includes(S.model)){S.model=models[0];save()}
-    if(ctxMap[S.model])S.ctx=ctxMap[S.model];
+    if(ctxMap[S.model]&&S.ctxAuto!==false)S.ctx=ctxMap[S.model];
   }catch(e){online=false}
   fillModels();setLink();return online}
 function fillModels(){const s=$('#msel'),list=models.length?models:(S.model?[S.model]:[]);
@@ -477,6 +479,7 @@ async function chatEndpoint(messages,onText,signal){
   for(;;){const{done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
     while((i=buf.indexOf('\n'))>=0){const ln=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!ln.startsWith('data:'))continue;const d=ln.slice(5).trim();if(d==='[DONE]')continue;
       let j=null;try{j=JSON.parse(d)}catch(e){}if(!j)continue;if(j.error)throw new Error(j.error.message||'the provider returned an error');const c=j.choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}}}
+  const rest=(buf+dec.decode()).trim();if(rest.startsWith('data:')){const d=rest.slice(5).trim();if(d!=='[DONE]'){try{const c=JSON.parse(d).choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}}catch(e){}}}
   return{text:full}}
 const blobOf=u=>{const[h,b]=u.split(','),bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:(h.match(/:(.*?);/)||[])[1]||'image/jpeg'})};
 async function chatClaude(messages,onText,signal,o={}){
@@ -539,7 +542,7 @@ log.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)retu
   if(a==='code')copyText(b.parentElement.querySelector('code').textContent,b);
   else if(a==='copy')copyText(el._t||el.querySelector('.body').innerText,b);
   else if(a==='say')speak(el._t||'',true);
-  else if(a==='retry'&&!busy){el.remove();if(S.history.length&&S.history[S.history.length-1].role==='assistant')S.history.pop();if(S.history.length)reply()}});
+  else if(a==='retry'&&!busy){el.remove();if(S.history.length&&S.history[S.history.length-1].role==='assistant')S.history.pop();if(S.history.length)reply(S.history[S.history.length-1].img?lastImgs:undefined)}});
 
 /* ---------- actions ---------- */
 function act(a,el){
@@ -580,19 +583,21 @@ async function stream(msgs,el,o){
 const aborted=e=>(ctl&&ctl.signal.aborted)||(e&&(e.name==='AbortError'||e.code==='aborted'||e.code==='cancelled'));
 async function ensureEngine(){if(!capsDone)await capsReady;if(!engine()&&!HOSTED)await probe();return engine()}
 async function reply(imgs){
-  setBusy(true);ctl=new AbortController();setState('thinking');
+  const ep=epoch;setBusy(true);const my=ctl=new AbortController();setState('thinking');
   const el=addMsg('ai','…',{tag:S.mode==='concierge'||inMission?'':MODES[S.mode].n});el.classList.add('live');let full='',trunc=false,err=null;
   try{if(!await ensureEngine())throw{code:'no_engine'};
     const r=await stream(buildMsgs(imgs),el,{tools:TOOLS(el),imgs});full=r.text;trunc=r.truncated}
-  catch(e){if(aborted(e))full=el._raw||(e&&e.text)||'';else err=e}
+  catch(e){if(my.signal.aborted||aborted(e))full=el._raw||(e&&e.text)||'';else err=e}
+  const cut=my.signal.aborted;
+  if(ep!==epoch){pendingMission=null;setBusy(false);if(orb.state==='thinking')setState('idle');return}
   el.classList.remove('live');
   if(err){el.remove();fail(err)}
-  else{const shown=clean(full);if(engine()!=='claude')runActs(full,el);
+  else{const shown=clean(full);if(engine()!=='claude'&&!cut)runActs(stripThink(full),el);
     if(!shown&&!el.querySelector('.act'))el.remove();
-    else{setBody(el,shown||'Done.');el._t=shown||'Done.';if(trunc)chip(el,'ANSWER CUT SHORT');tools(el);
-      S.history.push({role:'assistant',content:engine()==='claude'?(shown||'Done.'):stripThink(full).trim(),t:Date.now()});speak(shown)}}
+    else{setBody(el,shown||'Done.');el._t=shown||'Done.';if(trunc)chip(el,'ANSWER CUT SHORT');if(cut)chip(el,'STOPPED');tools(el);
+      S.history.push({role:'assistant',content:engine()==='claude'?(shown||'Done.'):stripThink(full).trim(),t:Date.now()});if(!cut)speak(shown)}}
   save();setBusy(false);if(orb.state==='thinking')setState('idle');home();stats();
-  if(pendingMission){const o=pendingMission;pendingMission=null;if(!err&&!inMission)mission(o)}}
+  if(pendingMission){const o=pendingMission;pendingMission=null;if(!err&&!cut&&!inMission)mission(o)}}
 function fail(e){
   const c=e&&e.code;let m;
   if(c==='no_engine')m=HOSTED?'Claude is not available to this page in this view. Open the deck in a Claude browser tab or app while signed in, then try again.':needsKey()?'An API key is needed for OpenRouter. Open **Settings**, paste your key, then press Retry.':`No model is answering at \`${S.url}\`. Start your model server, then open **Settings → Test link**.`;
@@ -628,13 +633,13 @@ async function mission(obj){
 function send(text){
   text=(text||'').trim();const imgs=pending;if(!text&&!imgs.length)return;if(busy)return;
   if(text[0]==='/'&&slash(text))return;
-  pending=[];renderPend();stopSpeak();
+  pending=[];lastImgs=imgs;renderPend();stopSpeak();
   addMsg('user',text,{imgs});S.history.push({role:'user',content:text,t:Date.now(),img:imgs.length});save();
   setMode(classify(text,imgs));reply(imgs)}
 function slash(t){
   const[,c,a='']=t.match(/^\/(\w+)\s*([\s\S]*)/)||[];if(!c)return false;const arg=a.trim();
   switch(c){
-    case'timer':{const s=parseDur(arg);if(!s){toast('Try: /timer 5m tea');break}act({tool:'timer',seconds:s,label:arg.replace(/^[\d.\shms]+/i,'').trim()||'timer'});break}
+    case'timer':{const d=splitDur(arg);if(!d.s){toast('Try: /timer 5m tea');break}act({tool:'timer',seconds:d.s,label:d.label||'timer'});break}
     case'task':case'note':case'remember':if(arg)act({tool:c,text:arg});break;
     case'mission':if(arg){addMsg('user',arg);S.history.push({role:'user',content:arg,t:Date.now()});mission(arg)}break;
     case'clear':clearChat();break;case'export':exportData();break;
@@ -642,7 +647,7 @@ function slash(t){
     default:return false}
   inp.value='';grow();return true}
 function help(){addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space)':''}, and read replies aloud.\n- Run timers, keep tasks and notes, and remember facts about you between sessions. Just ask in plain words.\n- Look at images you attach or paste.\n- Adapt to the task on my own: quick conversation, status briefings, image analysis, hands-on steps, or deep reasoning. The label at the top shows which.\n- Take a big objective, plan it and work it step by step. I start a mission myself when a request calls for one, or you can force it with \`/mission your objective\`.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/clear\` · \`/export\`\n\nI cannot browse the web, read your files or control devices from here.`)}
-function clearChat(){stop();S.history=[];save();log.innerHTML='';home();stats();hello()}
+function clearChat(){epoch++;stop();pendingMission=null;S.history=[];save();log.innerHTML='';home();stats();hello()}
 async function exportData(){const data=JSON.stringify({...S,key:undefined},null,2),fn=S.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-export.json';
   if(CAP.dl){try{await CAP.dl.save({filename:fn,data});toast('Export saved.')}catch(e){if(!e||e.code!=='declined')toast('The export could not be saved here.')}return}
   if(HOSTED)return toast('Saving files is not available in this view.');
@@ -670,11 +675,13 @@ function renderOps(){
 function renderTimers(){
   $('#n-tm').textContent=S.timers.length||'';
   $('#timers').innerHTML=S.timers.map((t,i)=>{const left=(t.end-Date.now())/1000,f=left<=0,p=f?1:Math.max(0,1-left/t.total);return`<div class="timer ${f?'fin':''}"><svg viewBox="0 0 34 34"><circle class="t" cx="17" cy="17" r="13"/><circle class="v" cx="17" cy="17" r="13" stroke-dasharray="${(81.68*p).toFixed(1)} 81.68"/></svg><span title="${esc(t.label)}">${esc(t.label)}</span><b>${f?'DONE':dur(left)}</b><button class="x" data-del="timers:${i}" aria-label="Dismiss timer">✕</button></div>`}).join('')||'<div class="empty">none running</div>'}
+function tickTimers(){const n=$$('#timers .timer');if(n.length!==S.timers.length)return renderTimers();
+  S.timers.forEach((t,i)=>{const left=(t.end-Date.now())/1000,f=left<=0;n[i].classList.toggle('fin',f);n[i].querySelector('b').textContent=f?'DONE':dur(left);n[i].querySelector('.v').setAttribute('stroke-dasharray',(81.68*(f?1:Math.max(0,1-left/t.total))).toFixed(1)+' 81.68')})}
 function beep(){try{const A=window.AudioContext||window.webkitAudioContext,a=new A(),g=a.createGain();g.gain.value=.08;g.connect(a.destination);[0,.22,.44].forEach(d=>{const o=a.createOscillator();o.frequency.value=880;o.connect(g);o.start(a.currentTime+d);o.stop(a.currentTime+d+.12)});setTimeout(()=>a.close().catch(()=>{}),1200)}catch(e){}}
 $('#right').addEventListener('click',e=>{const d=e.target.closest('[data-del]'),t=e.target.closest('[data-tog]');
   if(d){const[k,i]=d.dataset.del.split(':');S[k].splice(+i,1)}else if(t){const x=S.tasks[+t.dataset.tog];x.done=!x.done}else return;save();renderOps()});
 $$('form.add').forEach(f=>f.addEventListener('submit',e=>{e.preventDefault();const i=f.querySelector('input'),v=i.value.trim();if(!v)return;
-  if(f.dataset.add==='timer'){const s=parseDur(v);if(!s)return toast('Try: 5m tea');act({tool:'timer',seconds:s,label:v.replace(/^[\d.\shms]+/i,'').trim()||'timer'})}else act({tool:f.dataset.add,text:v});i.value=''}));
+  if(f.dataset.add==='timer'){const d=splitDur(v);if(!d.s)return toast('Try: 5m tea');act({tool:'timer',seconds:d.s,label:d.label||'timer'})}else act({tool:f.dataset.add,text:v});i.value=''}));
 
 /* ---------- telemetry ---------- */
 let bat=null;try{navigator.getBattery&&navigator.getBattery().then(b=>bat=b).catch(()=>{})}catch(e){}
@@ -697,8 +704,8 @@ function stats(){
   $('#mic').hidden=!micOK();$('#bcam').hidden=HOSTED;$('#att').hidden=HOSTED&&capsDone&&!CAP.img}
 setInterval(()=>{
   $('#clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  let fired=false;S.timers.forEach(t=>{if(!t.fired&&Date.now()>=t.end){t.fired=fired=true;beep();toast('Timer complete · '+t.label);speak(`Timer complete: ${t.label}.`,true)}});if(fired)save();
-  if(S.timers.length)renderTimers()},500);
+  let fired=false;S.timers.forEach(t=>{if(!t.fired&&Date.now()>=t.end){t.fired=fired=true;beep();toast('Timer complete · '+t.label);speak(`Timer complete: ${t.label}.`)}});if(fired)save();
+  if(S.timers.length)tickTimers()},500);
 setInterval(stats,2000);
 if(!HOSTED){setInterval(()=>{if(!busy&&online)probe()},15000);addEventListener('focus',()=>{if(!online&&!busy)probe()})}
 
@@ -852,11 +859,11 @@ function openSet(){$('#eng-h').hidden=!HOSTED;$('#eng-l').hidden=HOSTED;$('#stt-
   fillVoices();fillModels();$$('[data-k]').forEach(i=>{const v=S[i.dataset.k];if(i.type==='checkbox')i.checked=!!v;else if(i.id!=='vsel'&&i.id!=='msel')i.value=v});
   $('#testr').textContent='';$('#wipe').textContent='Erase everything';$('#set').showModal()}
 $('#set').addEventListener('change',e=>{const i=e.target.closest('[data-k]');if(!i)return;const k=i.dataset.k;S[k]=i.type==='checkbox'?i.checked:i.type==='number'||i.type==='range'?+i.value:i.value.trim();
-  if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];$('#k-ctx').value=S.ctx}if(k==='wake'){S.wake?armWake():wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
+  if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){S.wake?armWake():wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
   if(k==='rate'&&CAP.tts)CAP.tts.setRate(S.rate).catch(()=>{});save();setLink();stats()});
 $('#test').onclick=async()=>{const r=$('#testr');r.textContent='testing…';r.style.color='var(--dim)';const ok=await probe();r.textContent=ok?`ready · ${models.length} model${models.length===1?'':'s'} · ${lats[lats.length-1]} ms`:'no answer. Is the server running, with CORS allowed?';r.style.color=ok?'var(--ok)':'var(--amber)'};
 $('#exp').onclick=exportData;$('#clr').onclick=()=>{clearChat();$('#set').close()};
-let wipeArm=0;$('#wipe').onclick=e=>{if(Date.now()-wipeArm<4000){try{localStorage.removeItem(KEY)}catch(x){}S={...DEF,tasks:[],notes:[],memory:[],timers:[],history:[]};$('#set').close();applyName();setMode('concierge');log.innerHTML='';home();renderOps();stats();toast('Everything erased.')}else{wipeArm=Date.now();e.target.textContent='Press again to erase'}};
+let wipeArm=0;$('#wipe').onclick=e=>{if(Date.now()-wipeArm<4000){epoch++;stop();pendingMission=null;try{localStorage.removeItem(KEY)}catch(x){}S={...DEF,...VD,tasks:[],notes:[],memory:[],timers:[],history:[]};$('#set').close();applyName();setMode('concierge');try{localStorage.removeItem(KEY)}catch(x){}log.innerHTML='';home();renderOps();stats();probe();toast('Everything erased.')}else{wipeArm=Date.now();e.target.textContent='Press again to erase'}};
 $$('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 $$('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 function applyName(){$('#nm').textContent=S.name.toUpperCase()}
@@ -888,7 +895,7 @@ $('main').addEventListener('click',()=>$$('.rail').forEach(p=>p.classList.remove
 const typing=e=>/INPUT|TEXTAREA|SELECT|BUTTON/.test(e.target.tagName)||e.target.isContentEditable;
 addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('#pal').open?$('#pal').close():openPal();return}
-  if(e.key==='Escape'&&!document.querySelector('dialog[open]')){stop();listening&&unlisten();return}
+  if(e.key==='Escape'&&!document.querySelector('dialog[open]')){$$('.rail').forEach(p=>p.classList.remove('open'));stop();listening&&unlisten();return}
   if(e.code==='Space'&&!typing(e)&&!e.repeat&&micOK()&&!document.querySelector('dialog[open]')){e.preventDefault();listen()}});
 addEventListener('keyup',e=>{if(e.code==='Space'&&listening&&!typing(e))unlisten()});
 
