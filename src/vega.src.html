@@ -121,6 +121,15 @@ h3 small{order:3;font:500 11px var(--mono);color:var(--acc);letter-spacing:.06em
 main{grid-area:main;display:flex;flex-direction:column;min-height:0;min-width:0}
 #stage{flex:none;height:clamp(128px,22%,210px);display:flex;flex-direction:column;align-items:center;min-height:0;transition:height .6s cubic-bezier(.2,.7,.2,1)}
 body.home #stage{flex:1;height:auto}
+#amb{display:none;text-align:center;padding:0 20px 9vh}
+body.standby #amb{display:block}
+body.standby .rail,body.standby #log,body.standby #composer,body.standby #hello,body.standby .top{display:none}
+body.standby #app{grid-template:minmax(0,1fr)/minmax(0,1fr);grid-template-areas:"main"}
+body.standby #stage{flex:1;height:auto;cursor:pointer}
+#ambt{display:block;font:300 clamp(56px,11vw,150px)/1 var(--disp);letter-spacing:.02em;font-variant-numeric:tabular-nums;text-shadow:0 0 44px rgba(var(--accrgb),.4)}
+#ambd{display:block;margin-top:12px;font:500 13px var(--disp);letter-spacing:.34em;text-transform:uppercase;color:var(--dim)}
+#ambx{display:block;margin-top:16px;font-style:normal;color:var(--tx);font-size:15px;opacity:.86;min-height:22px}
+.pan td.ok{color:var(--ok);font:500 12px var(--mono);letter-spacing:.08em}.pan td.bad{color:var(--bad);font:500 12px var(--mono);letter-spacing:.08em}.pan td.na{color:var(--faint)}
 #core{flex:1;min-height:60px;width:100%}
 #state{flex:none;text-align:center;padding:0 16px 10px}
 #st{display:inline-flex;align-items:center;gap:12px;font:500 11px var(--disp);letter-spacing:.5em;text-indent:.5em;color:var(--acc);text-transform:uppercase;text-shadow:0 0 16px rgba(var(--accrgb),.7)}
@@ -265,7 +274,7 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
 }
 @media (max-width:900px){#clock,#stance span{display:none}}
 @media (pointer:coarse){.ib{width:40px;height:40px}.mb{padding:9px 12px}.x{padding:10px 8px;margin:-8px -6px}.cb{width:20px;height:20px}.steps summary{padding:8px 0}.chip{height:40px;min-width:40px;justify-content:center}}
-@media (max-width:640px){#clock,.chip span,.glyph{display:none}#stn{font-size:0;letter-spacing:.12em}#stn::after{content:attr(data-s);font-size:12px}body:not(.home) #stage{height:116px}body:not(.home) #state{padding-bottom:4px}#sugg{display:grid;grid-template-columns:1fr 1fr}.sg{padding:12px 8px;letter-spacing:.1em}.chip{padding:0 9px}.f{grid-template-columns:1fr;gap:4px}.tr{gap:8px}.brand b{font-size:15px;letter-spacing:.3em}#stance span{display:none}.msg.user{max-width:88%}}
+@media (max-width:640px){#clock,.chip span,.glyph,#bthr{display:none}#stn{font-size:0;letter-spacing:.12em}#stn::after{content:attr(data-s);font-size:12px}body:not(.home) #stage{height:116px}body:not(.home) #state{padding-bottom:4px}#sugg{display:grid;grid-template-columns:1fr 1fr}.sg{padding:12px 8px;letter-spacing:.1em}.chip{padding:0 9px}.f{grid-template-columns:1fr;gap:4px}.tr{gap:8px}.brand b{font-size:15px;letter-spacing:.3em}#stance span{display:none}.msg.user{max-width:88%}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -278,6 +287,7 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
     <div class="tr">
       <button class="chip wait" id="link" title="Engine settings"><span>Linking</span></button>
       <span id="clock"></span>
+      <button class="ib" id="bthr" title="Conversations" aria-label="Conversations"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></button>
       <button class="ib" id="bpal" title="Command palette (Ctrl+K)" aria-label="Command palette"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
       <button class="ib" id="bset" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
       <button class="ib only-narrow" id="tgr" aria-label="Operations"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg></button>
@@ -322,6 +332,7 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
     <section id="stage">
       <div id="core"></div>
       <div id="state"><span id="st">Standby</span><small id="cap"></small></div>
+      <div id="amb"><b id="ambt"></b><span id="ambd"></span><em id="ambx"></em></div>
       <div id="hello"><h1 id="hh"></h1><p id="hp"></p><div id="sugg"></div></div>
     </section>
     <section id="log" aria-live="polite"></section>
@@ -388,6 +399,8 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
     <h3>Voice</h3>
     <div class="f"><label for="k-speak">Speak replies</label><input id="k-speak" data-k="speak" type="checkbox"></div>
     <div class="f"><label for="vsel">Voice</label><select data-k="voice" id="vsel"></select></div>
+    <div class="f" id="veng-l"><label for="k-veng">Voice engine</label><select id="k-veng" data-k="vengine"><option value="system">System voices</option><option value="neural">Neural voice, runs in this browser</option></select></div>
+    <p class="note" id="veng-n">The neural voice is a speech model that runs on your own device: about 90 MB is fetched once, then nothing you say or hear leaves the browser. It sounds far more natural than most system voices and needs a reasonably fast computer. In Edge, the system voices marked "natural" are also very good.</p>
     <div class="f"><label for="k-rate">Pace</label><input id="k-rate" data-k="rate" type="range" min="0.7" max="1.5" step="0.05"></div>
     <div id="stt-l">
       <div class="f"><label for="k-stt">Speech recognition</label><select id="k-stt" data-k="stt"><option value="browser">Browser built-in</option><option value="local">Local Whisper endpoint</option></select></div>
@@ -406,6 +419,7 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
     <p class="note">Conversation, tasks, notes and memory are kept in this browser only.</p>
   </div>
 </dialog>
+<dialog id="thr"><div class="dh"><span>Conversations</span><button class="ib" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="db"><button class="btn" id="thrnew" type="button">+ New conversation</button><ul class="list" id="thrl" style="margin-top:12px"></ul></div></dialog>
 <dialog id="pal"><input id="pq" placeholder="Type a command…" autocomplete="off" aria-label="Command"><ul id="pl"></ul></dialog>
 <dialog id="cam"><div class="dh"><span>Visual feed</span><button class="ib" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><video autoplay playsinline muted></video><div class="db"><button class="btn" id="snap" type="button">Capture frame</button></div></dialog>
 <dialog id="doc"><div class="dh"><span id="doct"></span><button class="ib" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="db"><div class="body" id="docb"></div><div class="docbar"><button class="btn" id="doccp" type="button">Copy</button><button class="btn" id="docdl" type="button">Download</button><button class="btn" id="docrm" type="button">Delete</button></div></div></dialog>
@@ -449,8 +463,8 @@ function classify(t,imgs){
   if(/\b(how do i|how to|step by step|walk me through|fix my|install|set ?up|assemble|recipe|instructions|repair|wire|troubleshoot)\b/i.test(t))return'workshop';
   if(/\b(status|brief(ing)?|report|schedule|agenda|priorit\w+|deadline|tasks?|timers?|remind|today|tomorrow|this week)\b/i.test(t))return'ops';
   return'concierge'}
-const DEF={name:'VEGA',user:'boss',home:'',proactive:true,sfx:true,url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,
-  freeOnly:true,web:true,relay:'',bg:false,device:'',stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
+const DEF={name:'VEGA',user:'boss',home:'',proactive:true,sfx:true,url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,vengine:'system',nvoice:'bm_george',
+  freeOnly:true,auto:true,web:true,relay:'',bg:false,device:'',stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
 const VD=window.VEGA_DEFAULTS||{};
 let S={...DEF,...VD};
 let hadSaved=false;try{const raw=localStorage.getItem(KEY);hadSaved=raw!==null;S={...S,...JSON.parse(raw||'{}')}}catch(e){}
@@ -516,26 +530,29 @@ async function probe(){
   }catch(e){online=false}
   fillModels();setLink();return online}
 function fillModels(){const s=$('#msel'),list=models.length?models:(S.model?[S.model]:[]);
-  s.innerHTML=list.map(m=>`<option${m===S.model?' selected':''}>${esc(m)}</option>`).join('')||'<option value="">no models found yet</option>'}
+  const bad=S.badModels||{},auto=S.auto!==false;
+  s.innerHTML=(list.length?`<option value="__auto"${auto?' selected':''}>Automatic: use whichever answers best</option>`:'')+list.map(m=>`<option value="${esc(m)}"${!auto&&m===S.model?' selected':''}>${esc(m)}${bad[m]>Date.now()?' (unavailable today)':mstat(m).ok?' · '+mstat(m).ok+' ok':''}</option>`).join('')||'<option value="">no models found yet</option>'}
 function setLink(){
   const c=$('#link'),e=engine(),l=lats[lats.length-1];
   c.className='chip '+(e?'on':capsDone?'off':'wait');
-  c.firstElementChild.textContent=e==='claude'?'Claude · built-in':e?'Link · '+S.model:capsDone?'Connect a model':'Linking';
+  c.firstElementChild.textContent=e==='claude'?'Claude · built-in':e?'Link · '+(S.auto!==false?'auto · ':'')+S.model.split('/').pop():capsDone?'Connect a model':'Linking';
   $('#lat').textContent=l!=null?l:'—';$('#latu').textContent=e==='claude'?'ms reply':'ms link';
   $('#lst').textContent=e?'ready':capsDone?'not connected':'linking';$('#lst').style.color=e?'var(--ok)':'var(--amber)';
   let h=S.url;try{h=new URL(S.url).host}catch(x){}
   $('#host').textContent=e==='claude'?'Claude (hosted)':HOSTED?'—':h;$('#mdl').textContent=e==='claude'?(CAP.tier||'auto'):(S.model||'—');
   dial('d-lat',l!=null?l/(e==='claude'?4000:400):0);
   hello()}
-async function chatEndpoint(messages,onText,signal){
+async function chatEndpoint(messages,onText,signal,depth){
   if(priced&&S.freeOnly&&!freeSet.has(S.model))throw new Error('"'+S.model+'" is not a free model. Pick a free one in Settings.');
   const bad=S.badModels&&typeof S.badModels==='object'?S.badModels:(S.badModels={}),t0=Date.now();for(const k in bad)if(!(bad[k]>t0))delete bad[k];
-  const order=[S.model,...models.filter(m=>m!==S.model&&(!priced||!S.freeOnly||freeSet.has(m)))].filter(m=>!(busyM[m]>t0)&&!(bad[m]>t0)).slice(0,6);if(!order.length)order.push(S.model);
+  const order=[S.model,...models.filter(m=>m!==S.model&&(!priced||!S.freeOnly||freeSet.has(m)))].filter(m=>!(busyM[m]>t0)&&!(bad[m]>t0)).slice(0,6);if(S.auto!==false){const rk=rankedModels().slice(0,6);if(rk.length){order.length=0;order.push(...rk)}}
+  if(!order.length)order.push(S.model);
   /* an image needs a model that can see: route to one automatically */
-  if(visionSet.size&&messages.some(m=>Array.isArray(m.content)&&m.content.some(c=>c.type==='image_url'))){const vo=[...order.filter(m=>visionSet.has(m)),...[...visionSet].filter(m=>!order.includes(m))].slice(0,3);
+  const hasImg=messages.some(m=>Array.isArray(m.content)&&m.content.some(c=>c.type==='image_url'));
+  if(visionSet.size&&hasImg){const vo=[...order.filter(m=>visionSet.has(m)),...[...visionSet].filter(m=>!order.includes(m))].slice(0,3);
     if(vo.length){if(vo[0]!==S.model)toast('Using '+vo[0].split('/').pop()+' to look at the image.');order.length=0;order.push(...vo)}}
-  let r,used;
-  for(let i=0;i<order.length;i++){used=order[i];
+  let r,used,tReq=0;
+  for(let i=0;i<order.length;i++){used=order[i];tReq=performance.now();
     r=await fetch(base()+'/chat/completions',{method:'POST',signal,headers:hdr(),body:JSON.stringify({model:used,messages,stream:true,temperature:+S.temp})});
     if(r.ok)break;
     let why='';try{why=await r.clone().text()}catch(e){}
@@ -543,10 +560,11 @@ async function chatEndpoint(messages,onText,signal){
     /* refused outright (restricted, removed, not offered to this account) vs. merely busy */
     const refused=!ours&&(r.status===403||r.status===404||(r.status===400&&/model|endpoint|provider|not (available|supported)|no allowed/i.test(why)));
     const busyNow=!ours&&[408,429,500,502,503,504].includes(r.status);
-    if(refused){bad[used]=Date.now()+864e5;save()}else if(busyNow)busyM[used]=Date.now()+3e5;
+    if(refused){bad[used]=Date.now()+864e5;noteModel(used,false);save()}else if(busyNow){busyM[used]=Date.now()+3e5;noteModel(used,false)}
     if(!(refused||busyNow)||i===order.length-1)break;
     toast(used.split('/').pop()+(refused?' is not available here':' is busy')+'. Rerouting to '+order[i+1].split('/').pop()+'.')}
-  if(r.ok&&used!==S.model&&bad[S.model]>Date.now()){S.model=used;if(ctxMap[used]&&S.ctxAuto!==false)S.ctx=ctxMap[used];save();fillModels();setLink()}
+  if(r.ok)noteModel(used,true,performance.now()-tReq);
+  if(r.ok&&used!==S.model&&!hasImg&&(S.auto!==false||bad[S.model]>Date.now())){S.model=used;if(ctxMap[used]&&S.ctxAuto!==false)S.ctx=ctxMap[used];save();fillModels();setLink()}
   if(!r.ok)throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,240));
   if(used!==S.model)$('#mdl').textContent=used;
   let full='';
@@ -556,6 +574,7 @@ async function chatEndpoint(messages,onText,signal){
     while((i=buf.indexOf('\n'))>=0){const ln=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!ln.startsWith('data:'))continue;const d=ln.slice(5).trim();if(d==='[DONE]')continue;
       let j=null;try{j=JSON.parse(d)}catch(e){}if(!j)continue;if(j.error)throw new Error(j.error.message||'the provider returned an error');const c=j.choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}}}
   const rest=(buf+dec.decode()).trim();if(rest.startsWith('data:')){const d=rest.slice(5).trim();if(d!=='[DONE]'){try{const c=JSON.parse(d).choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}}catch(e){}}}
+  if(!stripThink(full).trim()&&!(signal&&signal.aborted)&&(depth||0)<2&&models.length>1){busyM[used]=Date.now()+3e5;noteModel(used,false);return chatEndpoint(messages,onText,signal,(depth||0)+1)}
   return{text:full}}
 const blobOf=u=>{const[h,b]=u.split(','),bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:(h.match(/:(.*?);/)||[])[1]||'image/jpeg'})};
 async function chatClaude(messages,onText,signal,o={}){
@@ -609,7 +628,7 @@ function buildMsgs(imgs){
 function setBody(el,t){el.querySelector('.body').innerHTML=md(t)}
 function scroll(){log.scrollTop=log.scrollHeight}
 function home(){document.body.classList.toggle('home',!log.children.length)}
-function addMsg(role,text,o={}){
+function addMsg(role,text,o={}){if(typeof inStandby==='function'&&inStandby())setStandby(false);
   const el=document.createElement('article');el.className='msg '+role;
   const who=role==='user'?(S.user||'You'):role==='sys'?'Deck':S.name;
   el.innerHTML=`<div class="who"><span>${esc(who)}</span><time>${hm(o.t?new Date(o.t):new Date())}</time>${o.tag?`<em>${esc(o.tag)}</em>`:''}</div><div class="body"></div><div class="panels"></div>${o.imgs&&o.imgs.length?`<div class="thumbs">${o.imgs.map(u=>`<img src="${u}" alt="attachment">`).join('')}</div>`:''}<div class="acts"></div>`;
@@ -855,7 +874,7 @@ function slash(t){
     default:return false}
   inp.value='';grow();return true}
 function help(){const web=relayOK()?'- **Search the web and read pages** for current facts, and cite where they came from.\n':'',facts=webOK()?'- Look things up in the **encyclopedia** and check the **weather** anywhere.\n':'';
-  addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space when not typing)':''}, and read replies aloud.\n${web}${facts}- **Calculate exactly** and **run code** in a sandbox for analysis and simulations.\n- Keep a **Library**: add text files or PDFs and I can read and search them; long work I produce is saved there for you to copy or download.\n- Run **timers and clock-time reminders**, keep **tasks and notes**, and **remember** facts about you between sessions.\n- Look at **images** you attach or paste${HOSTED?'':', or at your screen (say \`look at my screen\`)'}.\n- Put **charts, tables and weather panels** on screen.\n- Run **protocols**: routines you name and trigger with \`run the morning protocol\`, optionally on a daily schedule.\n${relayOK()?'- Post **sentries** on web pages and tell you when they change.\n':''}${convoOK()?'- Hold a hands-free **conversation**: say \`conversation mode\`, and \`that will be all\` to end.\n':''}- **Speak up** on my own: an arrival briefing, low power, lost connection.\n${HOSTED?'':'- Install as a **desktop app** and keep alerting you in the background (Settings → Desktop app).\n'}- Take a big objective, plan it, and work it step by step with my tools. I start a mission myself when a request calls for one, or use \`/mission your objective\`.\n\nI choose my approach for each request; the label at the top shows which.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/mission objective\` · \`/clear\` · \`/export\`\n\n${HOSTED?'In this hosted view I cannot reach the internet. ':relayOK()?'':'Web search needs a relay address in Settings. '}I cannot control other apps or devices.`)}
+  addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space when not typing)':''}, and read replies aloud.\n${web}${facts}- **Calculate exactly** and **run code** in a sandbox for analysis and simulations.\n- Keep a **Library**: add text files or PDFs and I can read and search them; long work I produce is saved there for you to copy or download.\n- Run **timers and clock-time reminders**, keep **tasks and notes**, and **remember** facts about you between sessions.\n- Look at **images** you attach or paste${HOSTED?'':', or at your screen (say \`look at my screen\`)'}.\n- Put **charts, tables and weather panels** on screen.\n- Run **protocols**: routines you name and trigger with \`run the morning protocol\`, optionally on a daily schedule.\n${relayOK()?'- Post **sentries** on web pages and tell you when they change.\n':''}${convoOK()?'- Hold a hands-free **conversation**: say \`conversation mode\`, and \`that will be all\` to end.\n':''}- Run a **system diagnostic** (\`run diagnostics\`), keep **saved conversations**, and show a **standby display** (\`standby\`).\n- **Speak up** on my own: an arrival briefing, low power, lost connection.\n${HOSTED?'':'- Install as a **desktop app** and keep alerting you in the background (Settings → Desktop app).\n'}- Take a big objective, plan it, and work it step by step with my tools. I start a mission myself when a request calls for one, or use \`/mission your objective\`.\n\nI choose my approach for each request; the label at the top shows which.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/mission objective\` · \`/clear\` · \`/export\`\n\n${HOSTED?'In this hosted view I cannot reach the internet. ':relayOK()?'':'Web search needs a relay address in Settings. '}I cannot control other apps or devices.`)}
 function clearChat(){epoch++;stop();pendingMission=null;S.history=[];save();log.innerHTML='';home();stats();hello()}
 async function exportData(){const data=JSON.stringify({...S,key:undefined,library:DOCS},null,2),fn=S.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-export.json';
   if(CAP.dl){try{await CAP.dl.save({filename:fn,data});toast('Export saved.')}catch(e){if(!e||e.code!=='declined')toast('The export could not be saved here.')}return}
@@ -889,7 +908,7 @@ function renderTimers(){
   $('#timers').innerHTML=S.timers.map((t,i)=>{const left=(t.end-Date.now())/1000,f=left<=0,p=f?1:Math.max(0,1-left/t.total);return`<div class="timer ${f?'fin':''}"><svg viewBox="0 0 34 34"><circle class="t" cx="17" cy="17" r="13"/><circle class="v" cx="17" cy="17" r="13" stroke-dasharray="${(81.68*p).toFixed(1)} 81.68"/></svg><span title="${esc(t.label)}">${esc(t.label)}</span><b>${f?'DONE':dur(left)}</b><button class="x" data-del="timers:${i}" aria-label="Dismiss timer">✕</button></div>`}).join('')||'<div class="empty">none running</div>'}
 function tickTimers(){const n=$$('#timers .timer');if(n.length!==S.timers.length)return renderTimers();
   S.timers.forEach((t,i)=>{const left=(t.end-Date.now())/1000,f=left<=0;n[i].classList.toggle('fin',f);n[i].querySelector('b').textContent=f?'DONE':dur(left);n[i].querySelector('.v').setAttribute('stroke-dasharray',(81.68*(f?1:Math.max(0,1-left/t.total))).toFixed(1)+' 81.68')})}
-function beep(){try{const A=window.AudioContext||window.webkitAudioContext,a=new A(),g=a.createGain();g.gain.value=.08;g.connect(a.destination);[0,.22,.44].forEach(d=>{const o=a.createOscillator();o.frequency.value=880;o.connect(g);o.start(a.currentTime+d);o.stop(a.currentTime+d+.12)});setTimeout(()=>a.close().catch(()=>{}),1200)}catch(e){}}
+
 $('#right').addEventListener('click',e=>{const pr=e.target.closest('[data-prun]'),pd=e.target.closest('[data-pdel]'),wd=e.target.closest('[data-wdel]');if(pr)return runProtocol(S.protocols[+pr.dataset.prun]);if(pd){S.protocols.splice(+pd.dataset.pdel,1);save();renderPresence();return}if(wd){S.watches.splice(+wd.dataset.wdel,1);save();renderPresence();return}
   const od=e.target.closest('[data-doc]'),dd=e.target.closest('[data-ddel]');if(od)return openDoc(+od.dataset.doc);if(dd){DOCS.splice(+dd.dataset.ddel,1);saveDocs();renderDocs();stats();return}
   const d=e.target.closest('[data-del]'),t=e.target.closest('[data-tog]');
@@ -911,14 +930,14 @@ function stats(){
   $('#h-bat').textContent=bat?Math.round(bat.level*100)+'%'+(bat.charging?' · charging':''):'—';
   $('#h-net').textContent=navigator.onLine?((navigator.connection&&navigator.connection.effectiveType)||'online'):'offline';
   $('#h-up').textContent=dur((Date.now()-boot)/1000);
-  $('#s-tts').textContent=!S.speak?'muted':CAP.tts?'Claude voice':hasSynth?'system voice':'text only';
+  $('#s-tts').textContent=!S.speak?'muted':CAP.tts?'Claude voice':neuralOK()?(NV.tts?'neural voice':'neural voice (loading)'):hasSynth?'system voice':'text only';
   $('#s-stt').textContent=CAP.dict?'dictation':HOSTED?'typing only':S.stt==='local'?'local whisper':SR?'browser':'typing only';
   $('#s-vis').textContent=engine()==='claude'?(CAP.img?'images':'off'):priced&&!visionSet.size?'no free vision model now':'images · camera · screen';
   $('#s-web').textContent=HOSTED?'not in this view':!webOK()?'off':S.relay?'search · pages · facts':'facts · weather';$('#s-code').textContent='sandbox · calculator';
   $('#s-wake').textContent=!S.wake||!SR?'off':wakeRec?'armed · say "'+S.name+'"':wakeNeed?'click once to arm':'starting';
   $('#mic').hidden=!micOK();$('#bcam').hidden=HOSTED;$('#att').hidden=HOSTED&&capsDone&&!CAP.img}
 setInterval(()=>{
-  $('#clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  ambTick();$('#clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   let fired=false;S.timers.forEach(t=>{if(!t.fired&&Date.now()>=t.end){t.fired=fired=true;SFX.alert();toast('Timer complete · '+t.label);notify('Timer complete: '+t.label,'t'+Math.round(t.end));speak(`Timer complete: ${t.label}.`)}});if(fired)save();
   if(S.timers.length)tickTimers()},500);
 setInterval(stats,2000);
@@ -926,20 +945,48 @@ if(!HOSTED){setInterval(()=>{if(!busy&&online)probe()},15000);addEventListener('
 
 /* ---------- voice ---------- */
 let voices=[],cvoices=[],rec=null,wakeRec=null,listening=false,micStream=null,actx=null,an=null,mrec=null,dbuf='';
-function fillVoices(){const s=$('#vsel');
+/* how good a system voice is likely to sound: natural/neural ones first, British English preferred */
+function voiceScore(v){const n=v.name,en=/^en/i.test(v.lang);let sc=en?10:0;if(/natural|neural/i.test(n))sc+=60;if(/premium|enhanced|siri/i.test(n))sc+=40;if(/^en-GB/i.test(v.lang))sc+=8;
+  if(/Google UK English Male/i.test(n))sc+=30;if(/\b(Ryan|Thomas|Oliver|Arthur|George|Daniel)\b/i.test(n))sc+=12;if(/\b(Sonia|Libby|Emma|Aria|Jenny|Samantha|Serena|Kate)\b/i.test(n))sc+=6;return sc}
+const NVOICES=[['bm_george','George · British, male'],['bm_lewis','Lewis · British, male'],['bf_emma','Emma · British, female'],['am_michael','Michael · American, male'],['af_heart','Heart · American, female'],['af_bella','Bella · American, female']];
+const neuralPicked=()=>!HOSTED&&!CAP.tts&&S.vengine==='neural';
+function fillVoices(){const s=$('#vsel');if(!s)return;s.dataset.k=neuralPicked()?'nvoice':'voice';
   if(CAP.tts)s.innerHTML=cvoices.map(v=>`<option value="${esc(v)}"${v===S.voice?' selected':''}>${esc(v[0].toUpperCase()+v.slice(1))}</option>`).join('')||'<option value="">Default</option>';
-  else{if(hasSynth)voices=speechSynthesis.getVoices();s.innerHTML='<option value="">System default</option>'+voices.map(v=>`<option value="${esc(v.name)}"${v.name===S.voice?' selected':''}>${esc(v.name)} · ${v.lang}${v.localService?'':' · cloud'}</option>`).join('')}}
+  else if(neuralPicked())s.innerHTML=NVOICES.map(([id,n])=>`<option value="${id}"${id===S.nvoice?' selected':''}>${n}</option>`).join('');
+  else{if(hasSynth)voices=speechSynthesis.getVoices();const best=pickVoice(),list=[...voices].sort((a,b)=>voiceScore(b)-voiceScore(a));
+    s.innerHTML=`<option value="">Automatic${best&&!S.voice?': '+esc(best.name):''}</option>`+list.map(v=>`<option value="${esc(v.name)}"${v.name===S.voice?' selected':''}>${esc(v.name)} · ${v.lang}${/natural|neural|premium|enhanced/i.test(v.name)?' · natural':''}${v.localService?'':' · cloud'}</option>`).join('')}
+  const ve=$('#veng-l');if(ve)ve.hidden=HOSTED||!!CAP.tts}
 if(hasSynth)try{speechSynthesis.onvoiceschanged=fillVoices}catch(e){}
 const VQ={said:0,n:0};let vAuto=null;
 function pickVoice(){if(!hasSynth)return null;if(!voices.length)voices=speechSynthesis.getVoices();const v=voices.find(v=>v.name===S.voice);if(v)return v;if(vAuto&&voices.includes(vAuto))return vAuto;
-  for(const p of[/Google UK English Male/i,/Daniel/i,/Arthur/i,/Ryan/i,/George/i,/Oliver/i]){const f=voices.find(v=>p.test(v.name)&&/^en/i.test(v.lang));if(f)return vAuto=f}
-  return vAuto=voices.find(v=>/^en-GB/i.test(v.lang))||voices.find(v=>/^en/i.test(v.lang))||null}
-const speakingNow=()=>{try{return CAP.tts?!!(CAP.tts.active&&CAP.tts.active()):(hasSynth&&(speechSynthesis.speaking||speechSynthesis.pending))}catch(e){return false}};
-function stopSpeak(){VQ.said=0;VQ.n=0;if(CAP.tts)CAP.tts.stop().catch(()=>{});else if(hasSynth)speechSynthesis.cancel();if(orb.state==='speaking')setState('idle')}
+  const en=voices.filter(v=>/^en/i.test(v.lang)).sort((a,b)=>voiceScore(b)-voiceScore(a));return vAuto=en[0]||null}
+
+/* ---------- neural voice: a speech model that runs inside this browser ---------- */
+const NV={tts:null,loading:null,q:[],playing:false,src:null,ctx:null,failed:false,gen:0};
+const neuralOK=()=>neuralPicked()&&!NV.failed&&typeof WebAssembly==='object';
+function nvLoad(){if(NV.tts)return Promise.resolve(NV.tts);if(NV.loading)return NV.loading;let seen=-1;
+  toast('Fetching the neural voice (about 90 MB, one time)…');
+  return NV.loading=(async()=>{const mod=await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.2.0/+esm'),K=mod.KokoroTTS||(mod.default&&mod.default.KokoroTTS);if(!K)throw new Error('voice library changed');
+    NV.tts=await K.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8',device:'wasm',progress_callback:x=>{if(x&&x.status==='progress'&&x.total>5e6){const pc=Math.floor(x.loaded/x.total*10)*10;if(pc>seen){seen=pc;toast('Fetching the neural voice: '+pc+'%')}}}});
+    toast('Neural voice ready.');stats();return NV.tts})().catch(e=>{NV.failed=true;NV.loading=null;toast('The neural voice could not be loaded here. Using the system voice.');fillVoices();stats();throw e})}
+async function nvPump(){if(NV.playing)return;NV.playing=true;const my=NV.gen;
+  try{const tts=await nvLoad();
+    while(NV.q.length&&my===NV.gen){const text=NV.q.shift(),a=await tts.generate(text,{voice:NVOICES.some(v=>v[0]===S.nvoice)?S.nvoice:'bm_george',speed:+S.rate||1});if(my!==NV.gen)break;
+      const raw=a&&(a.audio||a.data),rate=(a&&(a.sampling_rate||a.sample_rate))||24000;if(!raw||!raw.length)continue;
+      const A=window.AudioContext||window.webkitAudioContext;NV.ctx=NV.ctx||new A();if(NV.ctx.state==='suspended')await NV.ctx.resume().catch(()=>{});
+      const buf=NV.ctx.createBuffer(1,raw.length,rate);buf.copyToChannel(raw instanceof Float32Array?raw:Float32Array.from(raw),0);
+      await new Promise(res=>{const src=NV.ctx.createBufferSource(),an2=NV.ctx.createAnalyser();an2.fftSize=128;src.buffer=buf;src.connect(an2);an2.connect(NV.ctx.destination);NV.src=src;
+        const d=new Uint8Array(64),iv=setInterval(()=>{an2.getByteFrequencyData(d);let t=0;for(let i=0;i<64;i++)t+=d[i];orb.spike=Math.min(1,t/64/110)},70);
+        src.onended=()=>{clearInterval(iv);res()};if(wakeRec){try{wakeRec.abort()}catch(e){}}if(orb.state!=='listening')setState('speaking');src.start()});NV.src=null}}
+  catch(e){const rest=NV.q.splice(0);NV.failed=true;NV.playing=false;if(my===NV.gen)rest.forEach(t=>sayLine(t));stats();return}
+  NV.playing=false;if(my===NV.gen){if(orb.state==='speaking')setState('idle');spokeDone()}}
+const speakingNow=()=>{try{return NV.playing||NV.q.length>0||(CAP.tts?!!(CAP.tts.active&&CAP.tts.active()):(hasSynth&&(speechSynthesis.speaking||speechSynthesis.pending)))}catch(e){return false}};
+function stopSpeak(){VQ.said=0;VQ.n=0;NV.gen++;NV.q.length=0;try{NV.src&&NV.src.stop()}catch(e){}NV.playing=false;if(CAP.tts)CAP.tts.stop().catch(()=>{});else if(hasSynth)speechSynthesis.cancel();if(orb.state==='speaking')setState('idle')}
 const cleanSay=t=>t.replace(/```[\s\S]*?(```|$)/g,' The code is on screen. ').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/https?:\/\/\S+/g,'').replace(/[*_#`>|]/g,'').replace(/\s+/g,' ').trim();
 function sayLine(t){if(!t)return;
   if(CAP.tts){const o={rate:+S.rate||1};if(cvoices.includes(S.voice))o.voice=S.voice;try{Promise.resolve(CAP.tts.add?CAP.tts.add([{text:t.slice(0,1900)}],o):CAP.tts.speak(t.slice(0,1900),o)).catch(e=>{if(e&&e.code==='not_granted'){CAP.tts=null;stats();fillVoices()}})}catch(e){}return}
-  if(!hasSynth)return;if(wakeRec){try{wakeRec.abort()}catch(e){}}const u=new SpeechSynthesisUtterance(t),v=pickVoice();if(v)u.voice=v;u.rate=+S.rate||1;u.pitch=.96;VQ.n++;
+  if(neuralOK()){if(NV.tts){NV.q.push(t);nvPump();return}nvLoad().catch(()=>{})}   /* until the model has arrived, the system voice covers */
+  if(!hasSynth)return;if(wakeRec){try{wakeRec.abort()}catch(e){}}const u=new SpeechSynthesisUtterance(t),v=pickVoice();if(v)try{u.voice=v}catch(e){}u.rate=+S.rate||1;u.pitch=.96;VQ.n++;
   u.onstart=()=>{if(orb.state!=='listening')setState('speaking')};u.onboundary=()=>orb.spike=1;u.onend=u.onerror=()=>{VQ.n=Math.max(0,VQ.n-1);if(!VQ.n){if(orb.state==='speaking')setState('idle');spokeDone()}};speechSynthesis.speak(u)}
 function sayChunks(t){const lim=CAP.tts?700:240;let cur='';for(const x of t.split(/(?<=[.!?])\s+/)){if(cur&&(cur+' '+x).length>lim){sayLine(cur);cur=x}else cur=cur?cur+' '+x:x}sayLine(cur)}
 function speak(t,force){if((!S.speak&&!force)||!t)return;t=cleanSay(t);if(t)sayChunks(t)}
@@ -1082,6 +1129,7 @@ const CMDS=()=>[
   ...(!HOSTED?[{n:'Open camera',h:'vision',f:openCam},{n:'Test model link',h:'engine',f:async()=>toast(await probe()?'Link ready · '+S.model:'Nothing is answering at '+S.url)}]:[]),
   {n:'Attach image',h:'vision',f:()=>$('#file').click()},
   {n:'What can you do?',h:'help',f:help},
+  {n:'New conversation',h:'conversation',f:newChat},{n:'Conversations…',h:'conversation',f:openThreads},{n:'Run diagnostics',h:'system',f:diagnostics},{n:'Standby display',h:'display',f:()=>setTimeout(()=>setStandby(true),50)},
   {n:'Clear conversation',h:'data',f:clearChat},{n:'Export data',h:'data',f:exportData},
   ...(convoOK()?[{n:(S.convo?'End':'Start')+' conversation mode',h:'voice',f:()=>setConvo(!S.convo)}]:[]),
   ...(!HOSTED?[{n:'Show VEGA my screen',h:'vision',f:async()=>{const u=await captureScreen();if(u){pending.push(u);renderPend();inp.focus();toast('Screen captured. Ask about it.')}else toast('No screen was shared.')}}]:[]),
@@ -1096,13 +1144,18 @@ function palRun(i){const c=pf[i];$('#pal').close();c&&c.f()}
 $('#pq').addEventListener('input',()=>{pi=0;palRender()});
 $('#pq').addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();pi=(pi+(e.key==='ArrowDown'?1:-1)+pf.length)%Math.max(1,pf.length);palRender();const s=$('#pl .sel');s&&s.scrollIntoView({block:'nearest'})}else if(e.key==='Enter'){e.preventDefault();palRun(pi)}});
 $('#pl').addEventListener('click',e=>{const li=e.target.closest('[data-i]');li&&palRun(+li.dataset.i)});
-function openSet(){$('#eng-h').hidden=!HOSTED;$('#eng-l').hidden=HOSTED;$('#stt-l').hidden=HOSTED;$('#web-l').hidden=HOSTED;bgUI();$('#exp').hidden=HOSTED&&!CAP.dl;
+function openSet(){const vn=$('#veng-n');if(vn)vn.hidden=HOSTED||!!CAP.tts;$('#eng-h').hidden=!HOSTED;$('#eng-l').hidden=HOSTED;$('#stt-l').hidden=HOSTED;$('#web-l').hidden=HOSTED;bgUI();$('#exp').hidden=HOSTED&&!CAP.dl;
   fillVoices();fillModels();$$('[data-k]').forEach(i=>{const v=S[i.dataset.k];if(i.type==='checkbox')i.checked=!!v;else if(i.id!=='vsel'&&i.id!=='msel')i.value=v});
   $('#testr').textContent='';$('#wipe').textContent='Erase everything';$('#set').showModal()}
 $('#set').addEventListener('change',e=>{const i=e.target.closest('[data-k]');if(!i)return;const k=i.dataset.k;S[k]=i.type==='checkbox'?i.checked:i.type==='number'||i.type==='range'?+i.value:i.value.trim();
-  if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='home'){wxAt=0;wxHome=null;homeWeather()}if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){wakeGesture=true;wakeNeed=false;if(S.wake){if(!SR)toast('This browser has no speech recognition, so the wake word cannot listen. Use Chrome or Edge.');armWake()}else wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
-  if(k==='rate'&&CAP.tts)CAP.tts.setRate(S.rate).catch(()=>{});save();setLink();stats()});
+  if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='home'){wxAt=0;wxHome=null;homeWeather()}if(k==='model'){if(S.model==='__auto'){S.auto=true;S.model=rankedModels()[0]||models[0]||''}else S.auto=false;fillModels()}if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){wakeGesture=true;wakeNeed=false;if(S.wake){if(!SR)toast('This browser has no speech recognition, so the wake word cannot listen. Use Chrome or Edge.');armWake()}else wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
+  if(k==='rate'&&CAP.tts)CAP.tts.setRate(S.rate).catch(()=>{});
+  if(k==='vengine'){NV.failed=false;stopSpeak();fillVoices();if(S.vengine==='neural')nvLoad().then(()=>speak('Neural voice online'+hon()+'.',true)).catch(()=>{})}
+  if(k==='voice'||k==='nvoice'){vAuto=null;stopSpeak();speak('This is how I sound'+hon()+'.',true)}
+  save();setLink();stats()});
 $('#test').onclick=async()=>{const r=$('#testr');r.textContent='testing…';r.style.color='var(--dim)';const ok=await probe();r.textContent=ok?`ready · ${models.length} model${models.length===1?'':'s'} · ${lats[lats.length-1]} ms`:'no answer. Is the server running, with CORS allowed?';r.style.color=ok?'var(--ok)':'var(--amber)'};
+$('#bthr').onclick=openThreads;$('#thrnew').onclick=()=>{$('#thr').close();newChat()};
+$('#thrl').addEventListener('click',e=>{const o=e.target.closest('[data-topen]'),d=e.target.closest('[data-tdel]');if(o)openThread(o.dataset.topen);else if(d){S.threads=(S.threads||[]).filter(x=>String(x.id)!==d.dataset.tdel);save();renderThreads()}});
 $('#exp').onclick=exportData;$('#instbtn').onclick=installApp;$('#bgbtn').onclick=()=>S.bg?bgDisable():bgEnable();$('#clr').onclick=()=>{clearChat();$('#set').close()};
 let wipeArm=0;$('#wipe').onclick=e=>{if(Date.now()-wipeArm<4000){epoch++;stop();pendingMission=null;if(S.bg)bgDisable();try{localStorage.removeItem(KEY)}catch(x){}S={...DEF,...VD,tasks:[],notes:[],memory:[],timers:[],history:[]};DOCS=[];try{localStorage.removeItem(KEY+'.docs')}catch(x){}renderDocs();seedProtocols();renderPresence();wxHome=null;$('#set').close();applyName();setMode('concierge');try{localStorage.removeItem(KEY)}catch(x){}log.innerHTML='';home();renderOps();stats();probe();toast('Everything erased.')}else{wipeArm=Date.now();e.target.textContent='Press again to erase'}};
 $$('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
@@ -1216,6 +1269,7 @@ function sentinel(){
     const hrs=Math.floor((Date.now()-boot)/72e5);if(hrs>flag.long&&lastUser&&Date.now()-lastUser.t<6e5){flag.long=hrs;announce(`That is ${hrs*2} hours straight${hon()}. A short break tends to improve the work.`,'Wellbeing',{sound:false})}}
   const d=new Date(),hm2=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
   if(!S.bg)for(const p of S.protocols)if(p.at===hm2&&p.ran!==today()&&!busy&&engine()){p.ran=today();save();runProtocol(p,true);break}
+  if(!HOSTED&&standalone()&&S.proactive!==false&&!busy&&!listening&&!inStandby()&&!document.querySelector('dialog[open]')&&Date.now()-lastAct>6e5)setStandby(true);
   patrol();homeWeather()}
 addEventListener('offline',()=>{if(S.proactive!==false&&!flag.off){flag.off=true;announce('We have lost the network connection. Timers, the Library and calculations still work.','Network')}stats()});
 addEventListener('online',()=>{if(flag.off){flag.off=false;if(S.proactive!==false)announce('Connection restored.','Network',{sound:false})}stats();if(!HOSTED)probe()});
@@ -1234,6 +1288,9 @@ function instant(text){
   if(/^(that'?s all|that will be all|that'?ll be all|stand down|stop listening|end conversation)\b/i.test(t)){if(S.convo)setConvo(false);return say(pick(['Standing by','As you wish','I will be here'])+hon()+'.')}
   if(/^(start |enter |begin )?conversation mode\.?$|^let'?s talk\.?$/i.test(t)){setConvo(true);return true}
   if(/^(stop|cancel|never ?mind|abort)[.!]?$/i.test(t)){stop();return true}
+  if(/^(please\s+)?(run\s+)?(a\s+)?(full\s+)?(system\s+|systems\s+)?(diagnostics?|self[- ]?test|check)[.!]?$/i.test(t)&&/diagnos|self|check/i.test(t)&&t.length<40){diagnostics();return true}
+  if(/^(stand ?by|standby mode|go to standby|screensaver|go to sleep)[.!]?$/i.test(t)){addMsg('user',t);tools(addMsg('ai','Standing by'+hon()+'.',{tag:'Instant'}));speak('Standing by.');setTimeout(()=>setStandby(true),900);return true}
+  if(/^(new|start a new|fresh) (conversation|chat|thread)[.!]?$/i.test(t)){newChat();return true}
   if(/^(mute|be quiet|quiet|silence)[.!]?$/i.test(t)){stopSpeak();S.speak=false;save();stats();addMsg('user',t);tools(addMsg('ai','Muted. I will keep it to text.',{tag:'Instant'}));return true}
   if(/^(unmute|voice on|speak up|you can talk)[.!]?$/i.test(t)){S.speak=true;save();stats();return say('Voice restored'+hon()+'.')}
   if(/^(what(?:'s| is) the time|what time is it|time)\??$/i.test(t))return say('It is '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+hon()+'.');
@@ -1336,11 +1393,68 @@ function bgUI(){const b=$('#bgbtn');if(!b)return;$('#app-l').hidden=HOSTED;b.tex
   $('#bgst').textContent=!canSW()?'Install and background alerts work in the web version, opened in Chrome or Edge.':S.bg?'Background alerts are on: timers, sentries and protocol schedules reach this device even when '+S.name+' is closed.':standalone()?'Running as an installed app. Background alerts are off.':'Not installed on this device yet.'}
 addEventListener('focus',()=>pullInbox());
 
+/* ---------- engine selection that learns ---------- */
+const mstat=m=>(S.mstats&&S.mstats[m])||{ok:0,fail:0,ms:0};
+function noteModel(m,ok,ms){if(!m)return;const st=S.mstats&&typeof S.mstats==='object'?S.mstats:(S.mstats={}),x=st[m]||(st[m]={ok:0,fail:0,ms:0});
+  if(ok){x.ok++;if(ms>0)x.ms=x.ms?Math.round(x.ms*.7+ms*.3):Math.round(ms)}else x.fail++;if(x.ok+x.fail>60){x.ok=Math.round(x.ok/2);x.fail=Math.round(x.fail/2)}
+  const ks=Object.keys(st);if(ks.length>80)delete st[ks[0]]}
+function rankedModels(){const now=Date.now(),bad=S.badModels||{},pref=[/deepseek/,/llama/,/qwen/,/gemini|gemma/,/mistral/,/gpt|grok|phi|glm|kimi|hermes/];
+  const score=m=>{const x=mstat(m),n=x.ok+x.fail,rate=(x.ok+1.2)/(n+2),pi=pref.findIndex(p=>p.test(m));return rate*100-(x.ms?Math.min(x.ms,8000)/400:5)-(pi<0?6:pi)+Math.min((ctxMap[m]||0)/100000,3)};
+  return models.filter(m=>(!priced||!S.freeOnly||freeSet.has(m))&&!(bad[m]>now)&&!(busyM[m]>now)).sort((a,b)=>score(b)-score(a))}
+
+/* ---------- diagnostics ---------- */
+async function diagnostics(){
+  if(busy)return toast('One moment. I am still working on the last request.');stopSpeak();
+  addMsg('user','Run diagnostics');const el=addMsg('ai','Running a full diagnostic…',{tag:'Diagnostic'});el.classList.add('live');setState('thinking');setBusy(true);
+  const rows=[],add=(n,ok,d)=>rows.push([n,ok===true?'OK':ok===false?'FAULT':'—',String(d)]),host=u=>{try{return new URL(u).host}catch(e){return u}};
+  try{
+    if(HOSTED){await capsReady;add('Engine',!!CAP.sample,CAP.sample?'Claude, built in':'not available in this view')}
+    else{const t=performance.now(),ok=await probe();add('Engine',ok&&!!S.model&&!needsKey(),needsKey()?'API key missing':ok&&S.model?S.model.split('/').pop()+' · '+Math.round(performance.now()-t)+' ms'+(S.auto!==false?' · automatic':''):'no answer from '+host(S.url));
+      if(ok){const r=rankedModels();add('Model pool',r.length>0,r.length+' usable of '+models.length+(Object.keys(S.badModels||{}).length?' · '+Object.keys(S.badModels).length+' set aside':''))}
+      if(S.relay){try{const t2=performance.now();await getJSON(rbase()+'/health',8000);add('Relay',true,Math.round(performance.now()-t2)+' ms')}catch(e){add('Relay',false,e.message)}
+        if(webOK()){try{const j=await getJSON(rbase()+'/search?q='+enc('weather forecast'),20000);add('Web search',(j.results||[]).length>0,(j.results||[]).length+' results'+(j.engine?' via '+j.engine:''))}catch(e){add('Web search',false,e.message)}}else add('Web search',null,'turned off')}
+      else add('Relay',null,'not set: no web search or background alerts')}
+    add('Voice out',!S.speak?null:!!(CAP.tts||hasSynth),!S.speak?'muted':CAP.tts?'Claude voice':hasSynth?((pickVoice()||{}).name||'system voice'):'not available');
+    let mic='';try{mic=(await navigator.permissions.query({name:'microphone'})).state}catch(e){}
+    add('Voice in',!micOK()?null:mic!=='denied',CAP.dict?'dictation':!micOK()?'typing only':(S.stt==='local'?'local whisper':'browser recognition')+(mic?' · microphone '+mic:''));
+    if(!HOSTED){add('Wake word',!S.wake?null:!!wakeRec,!S.wake?'off':wakeRec?'armed for "'+S.name+'"':wakeNeed?'needs one click to arm':'not listening');
+      const np='Notification'in window?Notification.permission:'unsupported';add('Notifications',np==='granted'?true:np==='denied'?false:null,np);
+      add('Background alerts',S.bg?true:null,S.bg?'on':'off');add('Desktop app',standalone()?true:null,standalone()?'installed':'running in a browser tab')}
+    let kbs=0;try{kbs=Math.round((JSON.stringify(S).length+JSON.stringify(DOCS).length)/1024)}catch(e){}
+    add('Memory store',kbs<4000,kbs+' KB · '+S.memory.length+' facts · '+DOCS.length+' documents · '+(S.threads||[]).length+' saved conversations');
+    add('Network',navigator.onLine,navigator.onLine?'online':'offline');
+  }catch(e){add('Diagnostic',false,e&&e.message||'interrupted')}
+  const faults=rows.filter(r=>r[1]==='FAULT'),text=faults.length?`Diagnostic complete. ${faults.length} fault${faults.length>1?'s':''}${hon()}: ${faults.map(f=>f[0].toLowerCase()).join(', ')}.`:`Diagnostic complete. All systems nominal${hon()}.`;
+  el.classList.remove('live');setBody(el,text);el._t=text;RUN.table({title:'System diagnostic',columns:['System','State','Detail'],rows},el);tools(el);
+  el.querySelectorAll('.pan td:nth-child(2)').forEach(td=>td.classList.add(td.textContent==='OK'?'ok':td.textContent==='FAULT'?'bad':'na'));
+  S.history.push({role:'user',content:'Run diagnostics',t:Date.now()},{role:'assistant',content:text+'\n'+rows.map(r=>r.join(' | ')).join('\n'),t:Date.now()});save();setBusy(false);setState('idle');stats();faults.length?SFX.alert():SFX.done();speak(text)}
+
+/* ---------- standby display ---------- */
+let wakeLock=null,lastAct=Date.now();
+const inStandby=()=>document.body.classList.contains('standby');
+function ambTick(){if(!inStandby())return;const d=new Date(),nt=S.timers.filter(t=>!t.fired).sort((a,b)=>a.end-b.end)[0],open=S.tasks.filter(t=>!t.done).length;
+  $('#ambt').textContent=d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});$('#ambd').textContent=d.toLocaleDateString([], {weekday:'long',day:'numeric',month:'long'});
+  $('#ambx').textContent=[wxHome?Math.round(wxHome.c.temperature_2m)+'° '+wxWord(wxHome.c.weather_code)+' in '+wxHome.l.name:'',nt?nt.label+' in '+dur((nt.end-Date.now())/1000):'',open?open+' open task'+(open>1?'s':''):''].filter(Boolean).join('   ·   ')}
+function setStandby(on){on=!!on;if(on===inStandby())return;document.body.classList.toggle('standby',on);$$('dialog[open]').forEach(d=>d.close());
+  if(on){ambTick();try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(l=>{wakeLock=l}).catch(()=>{})}catch(e){}}
+  else{try{wakeLock&&wakeLock.release()}catch(e){}wakeLock=null;lastAct=Date.now();if(innerWidth>1080)inp.focus()}}
+function touched(e){lastAct=Date.now();if(inStandby()){setStandby(false);if(e&&e.type==='keydown'&&e.key!==' '){e.preventDefault()}}}
+addEventListener('pointerdown',touched,true);addEventListener('keydown',touched,true);
+
+/* ---------- saved conversations ---------- */
+function archive(){const u=S.history.filter(m=>m.role==='user'&&!m.hidden);if(!u.length)return;if(!Array.isArray(S.threads))S.threads=[];
+  S.threads.unshift({id:Date.now(),title:String(u[0].content||'Conversation').replace(/^\[.*?\]\s*/,'').replace(/\s+/g,' ').slice(0,64)||'Conversation',t:Date.now(),n:u.length,history:S.history.slice(-120).map(m=>({...m,content:String(m.content).slice(0,6000)}))});S.threads=S.threads.slice(0,15)}
+function renderLog(){log.innerHTML='';S.history.filter(m=>!m.hidden).slice(-60).forEach(m=>{const u=m.role==='user',el=addMsg(u?'user':'ai',u?m.content.replace(/^\[Run the "(.+?)" protocol\][\s\S]*/,'▸ Protocol: $1'):clean(m.content),{t:m.t});if(m.img)chip(el,m.img+' image'+(m.img>1?'s':'')+' (not kept)');if(!u)tools(el)});home();scroll()}
+function newChat(){if(busy)stop();archive();clearChat();toast('New conversation. The last one is saved.')}
+function renderThreads(){const l=S.threads||[];$('#thrl').innerHTML=l.map(t=>`<li><button class="dl" data-topen="${t.id}" type="button">${esc(t.title)}</button><small>${new Date(t.t).toLocaleDateString([], {day:'numeric',month:'short'})} · ${t.n} message${t.n===1?'':'s'}</small><button class="x" data-tdel="${t.id}" aria-label="Delete conversation">✕</button></li>`).join('')||'<li class="empty" style="border:0">No saved conversations yet. Starting a new conversation saves the current one here.</li>'}
+function openThreads(){renderThreads();$('#thr').showModal()}
+function openThread(id){const t=(S.threads||[]).find(x=>String(x.id)===String(id));if(!t)return;epoch++;stop();pendingMission=null;archive();S.threads=S.threads.filter(x=>x.id!==t.id);S.history=t.history||[];save();renderLog();stats();hello();$('#thr').close()}
+
 /* ---------- boot ---------- */
 if(innerWidth<600)inp.placeholder='Speak or type…';
 applyName();setMode('concierge');
 S.timers=S.timers.filter(t=>!t.fired);
-S.history.filter(m=>!m.hidden).slice(-60).forEach(m=>{const u=m.role==='user',el=addMsg(u?'user':'ai',u?m.content.replace(/^\[Run the "(.+?)" protocol\][\s\S]*/,'▸ Protocol: $1'):clean(m.content),{t:m.t});if(m.img)chip(el,m.img+' image'+(m.img>1?'s':'')+' (not kept)');if(!u)tools(el)});
+renderLog();
 seedProtocols();S.convo=false;home();renderOps();renderDocs();renderPresence();stats();fillVoices();
 if(!HOSTED)probe().then(()=>{stats();armWake()});
 booted=true;if(innerWidth>1080)inp.focus();

@@ -28,13 +28,16 @@ It also works with any OpenAI-style endpoint. For a fully private setup point it
 - **Displays**: charts, tables and weather panels put on screen alongside the answer, plus one-tap follow-up suggestions.
 - **Sentries**: ask it to keep an eye on a web page and it reports when the page changes (needs the relay, and the deck open).
 - **Screen awareness**: say "look at my screen" to share a capture with a vision-capable model.
-- **Resilience**: if a free model is busy, VEGA reroutes to another one on its own.
+- **Resilience**: VEGA chooses the model itself, learns which free models answer reliably and quickly, sets aside ones that refuse, and reroutes mid-request when one is busy or returns nothing.
+- **Diagnostics**: say "run diagnostics" for a live check of the engine, relay, search, voice, microphone, notifications and storage.
+- **Standby display**: say "standby" for a full-screen clock with weather, next timer and open tasks; the installed app does it after ten quiet minutes.
+- **Saved conversations**: start a new conversation and the last one is kept; reopen any of the last fifteen.
 - **Desktop app**: install it from the browser (Chrome or Edge: the install icon in the address bar, or Settings → Desktop app) and it opens in its own window and still starts offline.
 - **Background alerts**: turn them on in Settings and the relay keeps your timers, sentries and protocol schedules, notifying the device through web push even when VEGA is closed. Scheduled protocols are run by the relay itself, from a snapshot of your tasks, notes and memory that the device syncs to it, and the result arrives as the notification.
 - **Vision routing**: when you attach an image, VEGA switches to a free model that can see, if one is available.
 - **Wake word**: say the assistant's name to wake it. It tolerates common mishearings and pauses while VEGA itself is speaking.
 - **Missions**: for a big objective VEGA plans it, works each step with its tools, delivers the result and files it in the Library. It starts one on its own, or use `/mission`.
-- **Voice**: hold Space to talk; replies can be read aloud. Optional wake word.
+- **Voice**: hold Space to talk; replies can be read aloud. Optional wake word. For a natural-sounding voice, choose the **neural voice** in Settings: a speech model that runs in your browser (about 90 MB, fetched once from public model hosts). System voices marked "natural" are picked automatically when available.
 - **Vision**: attach, paste or capture an image for a vision-capable model.
 - **Command palette**: Ctrl+K. Slash commands: `/timer 5m tea`, `/task`, `/note`, `/remember`, `/mission`, `/clear`, `/export`.
 

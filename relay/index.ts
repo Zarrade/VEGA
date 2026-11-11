@@ -261,7 +261,7 @@ export async function runProtocolJob(job, ctx) {
     "\nOpen tasks: " + (c.tasks.join("; ") || "none") + "\nNotes: " + (c.notes.join("; ") || "none") +
     "\nActive timers: " + (c.timers.join("; ") || "none") + "\nLong-term memory: " + (c.memory.join("; ") || "empty");
   const pref = [/deepseek/, /llama/, /qwen/, /gemini|gemma/, /mistral/], rank = (m) => { const i = pref.findIndex((p) => p.test(m.id)); return i < 0 ? 9 : i; };
-  const models = [...(await freeModels()).data].sort((a, b) => rank(a) - rank(b) || (b.context_length || 0) - (a.context_length || 0)).slice(0, 6);
+  const models = [...(await freeModels()).data].sort((a, b) => rank(a) - rank(b) || (b.context_length || 0) - (a.context_length || 0)).slice(0, 3);
   for (const m of models) {
     try {
       const r = await fetch(OR + "/chat/completions", { method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "X-Title": "VEGA" },
