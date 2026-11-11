@@ -421,6 +421,7 @@ if(VD.key&&!S.key&&(!hadSaved||S.url===VD.url)){S.url=VD.url||S.url;S.key=VD.key
 ['tasks','notes','memory','timers','history'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({...S,history:S.history.slice(-200)}))}catch(e){}};
 if(VD.relay&&!S.relay)S.relay=VD.relay;
+if(VD.relay&&VD.url&&!S.key&&/openrouter\.ai/i.test(S.url)){S.url=VD.url;S.model=''}
 let epoch=0,lastImgs=[],booted=false,inMission=false,pendingMission=null,online=false,models=[],priced=false,freeSet=new Set(),ctxMap={},busy=false,ctl=null,pending=[],sessTok=0,lats=[],boot=Date.now(),capsDone=!HOSTED;
 const log=$('#log'),inp=$('#inp');
 const dial=(id,f)=>{const c=document.querySelector('#'+id+' .v');if(c)c.style.strokeDasharray=(150.8*Math.max(0,Math.min(1,f||0)))+' 201.1'};
