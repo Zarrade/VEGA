@@ -287,6 +287,11 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
   #hello{padding-bottom:18px}#hello p{margin-bottom:14px}
   #ambt{font-size:clamp(52px,19vw,96px)}
 }
+/* lighter visuals: blurring glass over a moving background is the costliest effect on the page */
+.lowfx .card,.lowfx #composer,.lowfx .sg,.lowfx .msg.user,.lowfx .chip,.lowfx .ib,.lowfx .sgn{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.lowfx .card{background:linear-gradient(180deg,rgba(16,25,36,.94),rgba(11,17,25,.92))}
+.lowfx #composer{background:rgba(9,14,20,.96)}
+.lowfx body::after,body.lowfx::after{background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55))}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -408,6 +413,7 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
     <h3>Behaviour</h3>
     <div class="f"><label for="k-pro">Speak up unprompted</label><input id="k-pro" data-k="proactive" type="checkbox"></div>
     <div class="f"><label for="k-sfx">Interface sounds</label><input id="k-sfx" data-k="sfx" type="checkbox"></div>
+    <div class="f"><label for="k-low">Lighter visuals</label><input id="k-low" data-k="lowfx" type="checkbox"></div>
     <p class="note">When allowed to speak up, VEGA gives an arrival briefing once a day, warns about low power or a lost connection, and reports when a sentry spots a change.</p>
     <h3>Voice</h3>
     <div class="f"><label for="k-speak">Speak replies</label><input id="k-speak" data-k="speak" type="checkbox"></div>
@@ -489,7 +495,7 @@ function classify(t,imgs){
   if(/\b(how do i|how to|step by step|walk me through|fix my|install|set ?up|assemble|recipe|instructions|repair|wire|troubleshoot)\b/i.test(t))return'workshop';
   if(/\b(status|brief(ing)?|report|schedule|agenda|priorit\w+|deadline|tasks?|timers?|remind|today|tomorrow|this week)\b/i.test(t))return'ops';
   return'concierge'}
-const DEF={name:'VEGA',user:'boss',home:'',proactive:true,sfx:true,url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,vengine:'system',nvoice:'bm_george',
+const DEF={name:'VEGA',user:'boss',home:'',proactive:true,sfx:true,lowfx:false,url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,vengine:'system',nvoice:'bm_george',
   freeOnly:true,auto:true,web:true,relay:'',bg:false,device:'',stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
 const VD=window.VEGA_DEFAULTS||{};
 let S={...DEF,...VD};
@@ -497,7 +503,7 @@ let hadSaved=false;try{const raw=localStorage.getItem(KEY);hadSaved=raw!==null;S
 if(VD.key&&!S.key&&(!hadSaved||S.url===VD.url)){S.url=VD.url||S.url;S.key=VD.key;S.model=''}
 ['tasks','notes','memory','timers','history'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});
 const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify({...S,history:S.history.slice(-200)}))}catch(e){}};
-const save=()=>{markHist();persist();syncJobs();syncSoon()};
+const save=()=>{markHist();persist();syncJobs();syncDirty=true;syncSoon()};
 if(VD.relay&&!S.relay)S.relay=VD.relay;
 if(VD.relay&&VD.url&&!S.key&&/openrouter\.ai/i.test(S.url)){S.url=VD.url;S.model=''}
 const busyM={};
@@ -707,7 +713,7 @@ let DOCS=[];try{DOCS=JSON.parse(localStorage.getItem(KEY+'.docs')||'[]')}catch(e
 if(!Array.isArray(DOCS))DOCS=[];
 function saveDocs(){try{localStorage.setItem(KEY+'.docs',JSON.stringify(DOCS));return true}catch(e){toast('The Library is full. Delete a document to make room.');return false}}
 function addDoc(title,text,src){title=String(title||'Untitled').replace(/\s+/g,' ').trim().slice(0,80)||'Untitled';text=String(text||'').slice(0,400000);
-  const i=DOCS.findIndex(d=>d.title.toLowerCase()===title.toLowerCase()),d={title,text,src,t:Date.now()};if(i>=0)DOCS[i]=d;else DOCS.push(d);saveDocs();renderDocs();syncSoon();return d}
+  const i=DOCS.findIndex(d=>d.title.toLowerCase()===title.toLowerCase()),d={title,text,src,t:Date.now()};if(i>=0)DOCS[i]=d;else DOCS.push(d);saveDocs();renderDocs();syncDirty=true;syncSoon();return d}
 const findDoc=t=>{t=String(t||'').toLowerCase().trim();return t?(DOCS.find(d=>d.title.toLowerCase()===t)||DOCS.find(d=>d.title.toLowerCase().includes(t))):null};
 function searchDocs(q){const terms=String(q).toLowerCase().match(/[a-z0-9À-￿]{3,}/g)||[],hits=[];
   for(const d of DOCS)for(let i=0;i<d.text.length;i+=700){const ch=d.text.slice(i,i+900),lc=ch.toLowerCase();let sc=0;for(const t of terms){let k=-1;while((k=lc.indexOf(t,k+1))>=0)sc++}if(sc)hits.push({sc,t:d.title,ch})}
@@ -958,7 +964,7 @@ function stats(){
   $('#h-bat').textContent=bat?Math.round(bat.level*100)+'%'+(bat.charging?' · charging':''):'—';
   $('#h-net').textContent=navigator.onLine?((navigator.connection&&navigator.connection.effectiveType)||'online'):'offline';
   $('#h-up').textContent=dur((Date.now()-boot)/1000);
-  $('#s-tts').textContent=!S.speak?'muted':CAP.tts?'Claude voice':neuralPicked()?(NV.tts?'Bella':NV.failed?'unavailable here':NV.loading?'Bella (loading)':'Bella'):hasSynth?'system voice':'text only';
+  $('#s-tts').textContent=!S.speak?'muted':CAP.tts?'Claude voice':neuralPicked()?(NV.ready?'Bella':NV.failed?'unavailable here':NV.loading?'Bella (loading)':'Bella'):hasSynth?'system voice':'text only';
   $('#s-stt').textContent=CAP.dict?'dictation':HOSTED?'typing only':S.stt==='local'?'local whisper':SR?'browser':'typing only';
   $('#s-vis').textContent=engine()==='claude'?(CAP.img?'images':'off'):priced&&!visionSet.size?'no free vision model now':'images · camera · screen';
   $('#s-web').textContent=HOSTED?'not in this view':!webOK()?'off':S.relay?'search · pages · facts':'facts · weather';$('#s-code').textContent='sandbox · calculator';
@@ -990,30 +996,43 @@ function pickVoice(){if(!hasSynth)return null;if(!voices.length)voices=speechSyn
   const en=voices.filter(v=>/^en/i.test(v.lang)).sort((a,b)=>voiceScore(b)-voiceScore(a));return vAuto=en[0]||null}
 
 /* ---------- neural voice: a speech model that runs inside this browser ---------- */
-const NV={tts:null,loading:null,q:[],playing:false,src:null,ctx:null,failed:false,gen:0};
-const neuralOK=()=>neuralPicked()&&!NV.failed&&typeof WebAssembly==='object';
-function nvLoad(){if(NV.tts)return Promise.resolve(NV.tts);if(NV.loading)return NV.loading;let seen=-1;
+/* The model is heavy. It lives in a worker so generating speech never blocks the interface,
+   and sentences are generated ahead while the previous one is still playing. */
+const NVW=`import{KokoroTTS}from'https://cdn.jsdelivr.net/npm/kokoro-js@1.2.0/+esm';let tts=null;
+self.onmessage=async e=>{const m=e.data;try{
+  if(m.type==='load'){if(!tts)tts=await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8',device:'wasm',progress_callback:x=>{if(x&&x.status==='progress'&&x.total>5e6)self.postMessage({type:'progress',pc:Math.floor(x.loaded/x.total*10)*10})}});self.postMessage({type:'ready'})}
+  else if(m.type==='say'){const a=await tts.generate(m.text,{voice:'af_bella',speed:m.speed||1}),raw=a&&(a.audio||a.data),f=raw instanceof Float32Array?raw:Float32Array.from(raw||[]);self.postMessage({type:'audio',id:m.id,gen:m.gen,rate:(a&&(a.sampling_rate||a.sample_rate))||24000,data:f},[f.buffer])}
+}catch(err){self.postMessage({type:'error',stage:m.type,id:m.id,gen:m.gen,message:String(err&&err.message||err)})}};`;
+const NV={w:null,ready:false,loading:null,failed:false,gen:0,seq:0,order:[],got:new Map(),wait:[],playing:false,src:null,ctx:null};
+const neuralOK=()=>neuralPicked()&&!NV.failed&&typeof Worker==='function';
+function nvFail(){NV.failed=true;NV.ready=false;NV.loading=null;NV.wait.length=0;NV.order.length=0;NV.got.clear();try{NV.w&&NV.w.terminate()}catch(e){}NV.w=null;if(orb.state==='speaking')setState('idle');stats()}
+function nvLoad(){if(NV.ready)return Promise.resolve();if(NV.loading)return NV.loading;let seen=-1;
   toast('Fetching the voice (about 90 MB, one time)…');
-  return NV.loading=(async()=>{const mod=await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.2.0/+esm'),K=mod.KokoroTTS||(mod.default&&mod.default.KokoroTTS);if(!K)throw new Error('voice library changed');
-    NV.tts=await K.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8',device:'wasm',progress_callback:x=>{if(x&&x.status==='progress'&&x.total>5e6){const pc=Math.floor(x.loaded/x.total*10)*10;if(pc>seen){seen=pc;toast('Fetching the voice: '+pc+'%')}}}});
-    toast('Voice ready.');stats();return NV.tts})().catch(e=>{NV.failed=true;NV.loading=null;toast('The voice could not be loaded on this device, so replies are text only for now.');fillVoices();stats();throw e})}
-async function nvPump(){if(NV.playing)return;NV.playing=true;const my=NV.gen;
-  try{const tts=await nvLoad();
-    while(NV.q.length&&my===NV.gen){const text=NV.q.shift(),a=await tts.generate(text,{voice:'af_bella',speed:+S.rate||1});if(my!==NV.gen)break;
-      const raw=a&&(a.audio||a.data),rate=(a&&(a.sampling_rate||a.sample_rate))||24000;if(!raw||!raw.length)continue;
+  return NV.loading=new Promise((res,rej)=>{let w;try{w=new Worker(URL.createObjectURL(new Blob([NVW],{type:'text/javascript'})),{type:'module'})}catch(e){return rej(e)}
+      NV.w=w;w.onerror=()=>rej(new Error('the voice engine stopped'));
+      w.onmessage=e=>{const m=e.data||{};
+        if(m.type==='progress'){if(m.pc>seen){seen=m.pc;toast('Fetching the voice: '+m.pc+'%')}}
+        else if(m.type==='ready'){NV.ready=true;toast('Voice ready.');stats();NV.wait.splice(0).forEach(x=>{if(x[0]===NV.gen)nvSay(x[1])});res()}
+        else if(m.type==='audio'){if(m.gen===NV.gen){NV.got.set(m.id,m);nvPlay()}}
+        else if(m.type==='error'){if(m.stage==='load')rej(new Error(m.message));else if(m.gen===NV.gen){NV.got.set(m.id,{id:m.id,data:null});nvPlay()}}};
+      w.postMessage({type:'load'})})
+    .catch(e=>{nvFail();toast('The voice could not be loaded on this device, so replies are text only for now.');throw e})}
+function nvSay(t){const id=++NV.seq;NV.order.push(id);NV.w.postMessage({type:'say',id,gen:NV.gen,text:t,speed:+S.rate||1})}
+async function nvPlay(){if(NV.playing)return;NV.playing=true;const my=NV.gen;
+  try{while(my===NV.gen&&NV.order.length&&NV.got.has(NV.order[0])){const m=NV.got.get(NV.order[0]);NV.got.delete(NV.order.shift());if(!m.data||!m.data.length)continue;
       const A=window.AudioContext||window.webkitAudioContext;NV.ctx=NV.ctx||new A();if(NV.ctx.state==='suspended')await NV.ctx.resume().catch(()=>{});
-      const buf=NV.ctx.createBuffer(1,raw.length,rate);buf.copyToChannel(raw instanceof Float32Array?raw:Float32Array.from(raw),0);
+      const buf=NV.ctx.createBuffer(1,m.data.length,m.rate||24000);buf.copyToChannel(m.data,0);
       await new Promise(res=>{const src=NV.ctx.createBufferSource(),an2=NV.ctx.createAnalyser();an2.fftSize=128;src.buffer=buf;src.connect(an2);an2.connect(NV.ctx.destination);NV.src=src;
-        const d=new Uint8Array(64),iv=setInterval(()=>{an2.getByteFrequencyData(d);let t=0;for(let i=0;i<64;i++)t+=d[i];orb.spike=Math.min(1,t/64/110)},70);
+        const d=new Uint8Array(64),iv=setInterval(()=>{an2.getByteFrequencyData(d);let t=0;for(let i=0;i<64;i++)t+=d[i];orb.spike=Math.min(1,t/64/110)},90);
         src.onended=()=>{clearInterval(iv);res()};if(wakeRec){try{wakeRec.abort()}catch(e){}}if(orb.state!=='listening')setState('speaking');src.start()});NV.src=null}}
-  catch(e){NV.q.length=0;NV.failed=true;NV.playing=false;if(orb.state==='speaking')setState('idle');stats();return}
-  NV.playing=false;if(my===NV.gen){if(orb.state==='speaking')setState('idle');spokeDone()}}
-const speakingNow=()=>{try{return NV.playing||NV.q.length>0||(CAP.tts?!!(CAP.tts.active&&CAP.tts.active()):(hasSynth&&(speechSynthesis.speaking||speechSynthesis.pending)))}catch(e){return false}};
-function stopSpeak(){VQ.said=0;VQ.n=0;NV.gen++;NV.q.length=0;try{NV.src&&NV.src.stop()}catch(e){}NV.playing=false;if(CAP.tts)CAP.tts.stop().catch(()=>{});else if(hasSynth)speechSynthesis.cancel();if(orb.state==='speaking')setState('idle')}
+  catch(e){/* a playback problem should never take the deck down */}
+  NV.playing=false;if(my===NV.gen&&!NV.order.length){if(orb.state==='speaking')setState('idle');spokeDone()}}
+const speakingNow=()=>{try{return NV.playing||NV.order.length>0||NV.wait.length>0||(CAP.tts?!!(CAP.tts.active&&CAP.tts.active()):(hasSynth&&(speechSynthesis.speaking||speechSynthesis.pending)))}catch(e){return false}};
+function stopSpeak(){VQ.said=0;VQ.n=0;NV.gen++;NV.order.length=0;NV.got.clear();NV.wait.length=0;try{NV.src&&NV.src.stop()}catch(e){}if(CAP.tts)CAP.tts.stop().catch(()=>{});else if(hasSynth)speechSynthesis.cancel();if(orb.state==='speaking')setState('idle')}
 const cleanSay=t=>t.replace(/```[\s\S]*?(```|$)/g,' The code is on screen. ').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/https?:\/\/\S+/g,'').replace(/[*_#`>|]/g,'').replace(/\s+/g,' ').trim();
 function sayLine(t){if(!t)return;
   if(CAP.tts){const o={rate:+S.rate||1};if(cvoices.includes(S.voice))o.voice=S.voice;try{Promise.resolve(CAP.tts.add?CAP.tts.add([{text:t.slice(0,1900)}],o):CAP.tts.speak(t.slice(0,1900),o)).catch(e=>{if(e&&e.code==='not_granted'){CAP.tts=null;stats();fillVoices()}})}catch(e){}return}
-  if(neuralPicked()){if(!NV.failed){if(NV.tts){NV.q.push(t);nvPump()}else nvLoad().catch(()=>{})}return}   /* one voice only: text until it is ready */
+  if(neuralPicked()){if(neuralOK()){if(NV.ready)nvSay(t);else{if(NV.wait.length<6)NV.wait.push([NV.gen,t]);nvLoad().catch(()=>{})}}return}   /* one voice only: text until it is ready */
   if(!hasSynth)return;if(wakeRec){try{wakeRec.abort()}catch(e){}}const u=new SpeechSynthesisUtterance(t),v=pickVoice();if(v)try{u.voice=v}catch(e){}u.rate=+S.rate||1;u.pitch=.96;VQ.n++;
   u.onstart=()=>{if(orb.state!=='listening')setState('speaking')};u.onboundary=()=>orb.spike=1;u.onend=u.onerror=()=>{VQ.n=Math.max(0,VQ.n-1);if(!VQ.n){if(orb.state==='speaking')setState('idle');spokeDone()}};speechSynthesis.speak(u)}
 function sayChunks(t){const lim=CAP.tts?700:240;let cur='';for(const x of t.split(/(?<=[.!?])\s+/)){if(cur&&(cur+' '+x).length>lim){sayLine(cur);cur=x}else cur=cur?cur+' '+x:x}sayLine(cur)}
@@ -1090,13 +1109,17 @@ const LABEL={idle:'Standby',listening:'Listening',thinking:'Thinking',speaking:'
 function setState(s){orb.state=s;$('#st').textContent=LABEL[s];if(s==='idle'&&typeof wakeLabel==='function')wakeLabel()}
 (function(){
   const cv=$('#bg'),x=cv.getContext('2d'),core=$('#core'),N=1500,P=[],fb=new Uint8Array(128),NB=96,bars=new Float32Array(NB);
-  let W=0,H=0,D=1,last=0,cx=0,cy=0,R=0,init=false,far=1;
+  let W=0,H=0,D=1,last=0,cx=0,cy=0,R=0,init=false,far=1,prev=0,ema=16,fcount=0,slowRuns=0;
+  /* quality: 0 full, 1 lighter, 2 lightest. Starts lower on small machines and drops when frames run long. */
+  let lvl=S.lowfx?2:((navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||8)<=4||matchMedia('(pointer:coarse)').matches)?1:0;
+  const setLvl=n=>{lvl=n;document.body.classList.toggle('lowfx',lvl>0);W=0};setLvl(lvl);window.vegaQuality=()=>lvl;window.vegaSetQuality=setLvl;
   for(let i=0;i<N;i++){const y=1-2*(i+.5)/N,r=Math.sqrt(1-y*y),a=i*2.399963;P.push([Math.cos(a)*r,y,Math.sin(a)*r])}
   const calm=matchMedia('(prefers-reduced-motion:reduce)').matches,TAU=Math.PI*2;
-  function size(){D=Math.min(devicePixelRatio||1,2);const w=Math.round(cv.clientWidth*D),h=Math.round(cv.clientHeight*D);if(w&&h&&(w!==W||h!==H)){W=cv.width=w;H=cv.height=h}}
+  function size(){D=Math.min(devicePixelRatio||1,[2,1.5,1][lvl]);const w=Math.round(cv.clientWidth*D),h=Math.round(cv.clientHeight*D);if(w&&h&&(w!==W||h!==H)){W=cv.width=w;H=cv.height=h}}
   function ring(r,a0,a1){x.beginPath();x.arc(cx,cy,r,a0,a1);x.stroke()}
   function frame(ms){
     requestAnimationFrame(frame);
+    const fd=ms-prev;prev=ms;if(fd>0&&fd<250)ema+=(fd-ema)*.06;if(++fcount%90===0){if(S.lowfx&&lvl<2)setLvl(2);else if(ema>23&&lvl<2){if(++slowRuns>=2){slowRuns=0;ema=16;setLvl(lvl+1)}}else slowRuns=0}
     const t=ms/1000,dt=Math.min(.05,t-last);last=t;size();if(W<4||H<4)return;
     const b=core.getBoundingClientRect(),tx=(b.left+b.width/2)*D,ty=(b.top+b.height/2)*D,tR=Math.max(26,Math.min(b.width*.36,b.height*.5)*.52)*D;
     if(!init){cx=tx;cy=ty;R=calm?tR:0;init=true}else{const k=calm?1:(ms<2400?.035:.12);cx+=(tx-cx)*k;cy+=(ty-cy)*k;R+=(tR-R)*k}
@@ -1108,7 +1131,7 @@ function setState(s){orb.state=s;$('#st').textContent=LABEL[s];if(s==='idle'&&ty
     far+=((document.body.classList.contains('home')?1:.28)-far)*.08;
     x.globalCompositeOperation='source-over';x.clearRect(0,0,W,H);x.lineWidth=D;
     /* far field: range rings, crosshair, bearing ticks */
-    [2.3,3.15,4.2,5.6].forEach((q,i)=>{x.strokeStyle=`rgba(${c},${(.085-i*.017)*far})`;ring(R*q,0,TAU)});
+    (lvl>1?[2.3,3.15]:[2.3,3.15,4.2,5.6]).forEach((q,i)=>{x.strokeStyle=`rgba(${c},${(.085-i*.017)*far})`;ring(R*q,0,TAU)});
     const gh=x.createLinearGradient(cx-R*6,0,cx+R*6,0);gh.addColorStop(0,`rgba(${c},0)`);gh.addColorStop(.5,`rgba(${c},${.1*far})`);gh.addColorStop(1,`rgba(${c},0)`);
     x.strokeStyle=gh;x.beginPath();x.moveTo(cx-R*6,cy);x.lineTo(cx-R*1.95,cy);x.moveTo(cx+R*1.95,cy);x.lineTo(cx+R*6,cy);x.stroke();
     x.strokeStyle=`rgba(${c},${.13*far})`;x.beginPath();
@@ -1124,12 +1147,14 @@ function setState(s){orb.state=s;$('#st').textContent=LABEL[s];if(s==='idle'&&ty
       x.fillStyle=`rgba(${c},.25)`;x.beginPath();x.arc(px,py,5*D,0,TAU);x.fill();x.fillStyle=`rgba(${c},1)`;x.beginPath();x.arc(px,py,1.8*D,0,TAU);x.fill()});
     /* particle sphere */
     const ca=Math.cos(orb.ang),sa=Math.sin(orb.ang),cb=Math.cos(.38),sb=Math.sin(.38),k=Math.max(1,R/150);
-    for(let i=0;i<N;i++){const p=P[i];
+    const stride=lvl+1,grow=lvl?1+lvl*.28:1;x.fillStyle=`rgb(${c})`;   /* one colour, alpha per point: no string building in the loop */
+    for(let i=0;i<N;i+=stride){const p=P[i];
       let n=Math.sin(p[1]*4+t*1.4)*Math.sin(p[0]*3-t*.9+p[2]*2);if(st==='thinking')n+=Math.sin(p[1]*9-t*5)*.6;
       const d=1+orb.amp*n*1.6;let X=(p[0]*ca+p[2]*sa)*d,Z=(-p[0]*sa+p[2]*ca)*d,Y=p[1]*d;const Y2=Y*cb-Z*sb;Z=Y*sb+Z*cb;
-      const s=1.7/(2.4-Z),al=.08+.92*Math.max(0,(Z+1.2)/2.4),sz=(.6+(Z+1)*.7)*k,px=cx+X*R*s,py=cy+Y2*R*s;
-      x.fillStyle=`rgba(${c},${al*al*.9})`;x.fillRect(px-sz/2,py-sz/2,sz,sz);
-      if(Z>.45){x.fillStyle=`rgba(${c},.07)`;x.fillRect(px-sz*1.6,py-sz*1.6,sz*3.2,sz*3.2)}}
+      const s=1.7/(2.4-Z),al=.08+.92*Math.max(0,(Z+1.2)/2.4),sz=(.6+(Z+1)*.7)*k*grow,px=cx+X*R*s,py=cy+Y2*R*s;
+      x.globalAlpha=al*al*.9;x.fillRect(px-sz/2,py-sz/2,sz,sz);
+      if(Z>.45&&lvl<2){x.globalAlpha=.07;x.fillRect(px-sz*1.6,py-sz*1.6,sz*3.2,sz*3.2)}}
+    x.globalAlpha=1;
     const nu=x.createRadialGradient(cx,cy,0,cx,cy,R*.6);nu.addColorStop(0,`rgba(${c},${.22+orb.amp*1.6})`);nu.addColorStop(1,`rgba(${c},0)`);x.fillStyle=nu;x.beginPath();x.arc(cx,cy,R*.6,0,TAU);x.fill();
     /* spectrum ring */
     x.strokeStyle=`rgba(${c},.7)`;x.lineWidth=Math.max(1.5,R/90);x.beginPath();
@@ -1177,7 +1202,7 @@ function openSet(){const vn=$('#veng-n');if(vn)vn.hidden=!neuralPicked();$('#eng
   fillVoices();fillModels();$$('[data-k]').forEach(i=>{const v=S[i.dataset.k];if(i.type==='checkbox')i.checked=!!v;else if(i.id!=='vsel'&&i.id!=='msel')i.value=v});
   $('#testr').textContent='';$('#wipe').textContent='Erase everything';$('#set').showModal()}
 $('#set').addEventListener('change',e=>{const i=e.target.closest('[data-k]');if(!i)return;const k=i.dataset.k;S[k]=i.type==='checkbox'?i.checked:i.type==='number'||i.type==='range'?+i.value:i.value.trim();
-  if(k==='name'||k==='user'||k==='home')S.sv=Date.now();if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='home'){wxAt=0;wxHome=null;homeWeather()}if(k==='model'){if(S.model==='__auto'){S.auto=true;S.model=rankedModels()[0]||models[0]||''}else S.auto=false;fillModels()}if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){wakeGesture=true;wakeNeed=false;if(S.wake){if(!SR)toast('This browser has no speech recognition, so the wake word cannot listen. Use Chrome or Edge.');armWake()}else wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
+  if(k==='name'||k==='user'||k==='home')S.sv=Date.now();if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='home'){wxAt=0;wxHome=null;homeWeather()}if(k==='model'){if(S.model==='__auto'){S.auto=true;S.model=rankedModels()[0]||models[0]||''}else S.auto=false;fillModels()}if(k==='lowfx'&&window.vegaSetQuality)window.vegaSetQuality(S.lowfx?2:0);if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){wakeGesture=true;wakeNeed=false;if(S.wake){if(!SR)toast('This browser has no speech recognition, so the wake word cannot listen. Use Chrome or Edge.');armWake()}else wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
   if(k==='rate'&&CAP.tts)CAP.tts.setRate(S.rate).catch(()=>{});
   if(k==='voice'){vAuto=null;stopSpeak();speak('This is how I sound'+hon()+'.',true)}
   save();setLink();stats()});
@@ -1444,7 +1469,7 @@ async function diagnostics(){
       if(S.relay){try{const t2=performance.now();await getJSON(rbase()+'/health',8000);add('Relay',true,Math.round(performance.now()-t2)+' ms')}catch(e){add('Relay',false,e.message)}
         if(webOK()){try{const j=await getJSON(rbase()+'/search?q='+enc('weather forecast'),20000);add('Web search',(j.results||[]).length>0,(j.results||[]).length+' results'+(j.engine?' via '+j.engine:''))}catch(e){add('Web search',false,e.message)}}else add('Web search',null,'turned off')}
       else add('Relay',null,'not set: no web search or background alerts')}
-    add('Voice out',!S.speak?null:CAP.tts?true:neuralPicked()?(NV.tts?true:NV.failed?false:null):!!hasSynth,!S.speak?'muted':CAP.tts?'Claude voice':neuralPicked()?(NV.tts?'Bella, ready':NV.failed?'Bella could not load on this device':'Bella, loads on first use'):hasSynth?'system voice':'not available');
+    add('Voice out',!S.speak?null:CAP.tts?true:neuralPicked()?(NV.ready?true:NV.failed?false:null):!!hasSynth,!S.speak?'muted':CAP.tts?'Claude voice':neuralPicked()?(NV.ready?'Bella, ready':NV.failed?'Bella could not load on this device':'Bella, loads on first use'):hasSynth?'system voice':'not available');
     let mic='';try{mic=(await navigator.permissions.query({name:'microphone'})).state}catch(e){}
     add('Voice in',!micOK()?null:mic!=='denied',CAP.dict?'dictation':!micOK()?'typing only':(S.stt==='local'?'local whisper':'browser recognition')+(mic?' · microphone '+mic:''));
     if(!HOSTED){add('Wake word',!S.wake?null:!!wakeRec,!S.wake?'off':wakeRec?'armed for "'+S.name+'"':wakeNeed?'needs one click to arm':'not listening');
@@ -1453,6 +1478,7 @@ async function diagnostics(){
     let kbs=0;try{kbs=Math.round((JSON.stringify(S).length+JSON.stringify(DOCS).length)/1024)}catch(e){}
     add('Memory store',kbs<4000,kbs+' KB · '+S.memory.length+' facts · '+DOCS.length+' documents · '+(S.threads||[]).length+' saved conversations');
     add('Network',navigator.onLine,navigator.onLine?'online':'offline');
+    add('Visuals',true,['full','lighter','lightest'][window.vegaQuality?window.vegaQuality():0]+' quality'+(S.lowfx?' (chosen in Settings)':''));
   }catch(e){add('Diagnostic',false,e&&e.message||'interrupted')}
   const faults=rows.filter(r=>r[1]==='FAULT'),text=faults.length?`Diagnostic complete. ${faults.length} fault${faults.length>1?'s':''}${hon()}: ${faults.map(f=>f[0].toLowerCase()).join(', ')}.`:`Diagnostic complete. All systems nominal${hon()}.`;
   el.classList.remove('live');setBody(el,text);el._t=text;RUN.table({title:'System diagnostic',columns:['System','State','Detail'],rows},el);tools(el);
@@ -1468,7 +1494,7 @@ function ambTick(){if(!inStandby())return;const d=new Date(),nt=S.timers.filter(
 function setStandby(on){on=!!on;if(on===inStandby())return;document.body.classList.toggle('standby',on);$$('dialog[open]').forEach(d=>d.close());
   if(on){ambTick();try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(l=>{wakeLock=l}).catch(()=>{})}catch(e){}}
   else{try{wakeLock&&wakeLock.release()}catch(e){}wakeLock=null;lastAct=Date.now();if(innerWidth>1080)inp.focus()}}
-function touched(e){lastAct=Date.now();if(neuralPicked()&&S.speak&&!NV.tts&&!NV.loading&&!NV.failed)nvLoad().catch(()=>{});if(inStandby()){setStandby(false);if(e&&e.type==='keydown'&&e.key!==' '){e.preventDefault()}}}
+function touched(e){lastAct=Date.now();if(neuralPicked()&&S.speak&&!NV.ready&&!NV.loading&&!NV.failed)nvLoad().catch(()=>{});if(inStandby()){setStandby(false);if(e&&e.type==='keydown'&&e.key!==' '){e.preventDefault()}}}
 addEventListener('pointerdown',touched,true);addEventListener('keydown',touched,true);
 
 /* ---------- saved conversations ---------- */
@@ -1485,7 +1511,7 @@ const KEYOF={tasks:x=>x.text,notes:x=>x.text,memory:x=>x.text,protocols:x=>Strin
 const addedAt=(n,x)=>n==='threads'?(+x.t||+x.id||0):n==='timers'?(+x.a||Math.floor(+x.id)||0):(+x.a||+x.t||0);
 function tombOf(name,x){if(!x)return;const T=S.tomb&&typeof S.tomb==='object'?S.tomb:(S.tomb={});T[name+':'+(name==='docs'?x.title:KEYOF[name](x))]=Date.now();
   const ks=Object.keys(T);if(ks.length>500)ks.sort((a,b)=>T[a]-T[b]).slice(0,ks.length-400).forEach(k=>delete T[k])}
-var histSig='',syncBusy=false,syncT=0;
+var histSig='',syncBusy=false,syncT=0,syncDirty=true;
 const hsig=()=>S.history.length+':'+((S.history[S.history.length-1]||{}).t||0);
 function markHist(){const h=hsig();if(h!==histSig){if(histSig!=='')S.hat=Date.now();histSig=h}}
 const b64of=u=>{let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s)};
@@ -1513,8 +1539,9 @@ async function syncNow(){
   if(HOSTED||!S.sync||!S.sync.code||!S.relay||syncBusy||!navigator.onLine)return;syncBusy=true;const sy=S.sync;
   try{const{id,k}=await syncKeys(sy.code);
     const r=await getJSON(rbase()+'/state?id='+id+'&rev='+(sy.rev||0));
-    if(r.blob){mergeState(await unseal(k,r.blob));sy.rev=r.rev}
-    if(sigOf(snapshot())!==sy.sig){
+    const merged=!!r.blob;if(merged){mergeState(await unseal(k,r.blob));sy.rev=r.rev}
+    const wasDirty=syncDirty;syncDirty=false;
+    if((merged||wasDirty||!sy.sig)&&sigOf(snapshot())!==sy.sig){
       for(let i=0;i<4;i++){let blob=await seal(k,snapshot());if(blob.length>2900000)blob=await seal(k,snapshot(true));
         const res=await fetch(rbase()+'/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,base:sy.rev||0,blob})}),j=await res.json().catch(()=>({}));
         if(res.status===409&&j.blob){mergeState(await unseal(k,j.blob));sy.rev=j.rev;continue}
