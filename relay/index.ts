@@ -7,6 +7,8 @@
 // - Only answers browsers on the origins listed in ALLOWED_ORIGINS.
 // - Runs timers, sentries and scheduled protocols in the background and
 //   notifies the installed app through web push.
+// - Stores the deck's end-to-end encrypted state so several devices can share it.
+// - Uses a search API first when BRAVE_API_KEY or TAVILY_API_KEY is set.
 //
 // Written as plain JavaScript in a .ts file so it runs unchanged on Supabase
 // Edge Functions (Deno) and can be unit-tested in Node.
@@ -119,6 +121,21 @@ const ENGINES = {
     }
     return out;
   },
+  // proper search APIs: used first when their key is set as a secret
+  async brave(q) {
+    const key = env("BRAVE_API_KEY"); if (!key) return [];
+    const r = await fetch("https://api.search.brave.com/res/v1/web/search?count=8&q=" + encodeURIComponent(q), { headers: { "X-Subscription-Token": key, "Accept": "application/json" } });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return (j.web?.results || []).slice(0, 8).map((x) => ({ title: decode(x.title || ""), url: x.url, snippet: decode(x.description || "") })).filter((x) => /^https?:\/\//.test(x.url || ""));
+  },
+  async tavily(q) {
+    const key = env("TAVILY_API_KEY"); if (!key) return [];
+    const r = await fetch("https://api.tavily.com/search", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key }, body: JSON.stringify({ api_key: key, query: q, max_results: 8 }) });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return (j.results || []).slice(0, 8).map((x) => ({ title: String(x.title || ""), url: x.url, snippet: String(x.content || "").replace(/\s+/g, " ").slice(0, 320) })).filter((x) => /^https?:\/\//.test(x.url || ""));
+  },
   async wiki(q) {
     const r = await fetch("https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=5&srsearch=" + encodeURIComponent(q), { headers: { "User-Agent": UA } });
     const j = await r.json();
@@ -134,11 +151,12 @@ const relevant = (q, list) => {
 let lastEngine = "db";
 async function search(q) {
   const lead = /\b(news|latest|today|tonight|headlines?|breaking|this week|recent(ly)?|update[sd]?)\b/i.test(q) ? await news(q) : [];
-  const order = [lastEngine, ...["db", "ddg", "lite", "wiki"].filter((e) => e !== lastEngine)];
+  const keyed = [env("BRAVE_API_KEY") ? "brave" : "", env("TAVILY_API_KEY") ? "tavily" : ""].filter(Boolean);
+  const order = [...keyed, ...[lastEngine, "db", "ddg", "lite", "wiki"].filter((e, i, a) => !keyed.includes(e) && a.indexOf(e) === i)];
   for (const name of order) {
     try {
       const got = relevant(q, await ENGINES[name](q));
-      if (got.length) { lastEngine = name === "wiki" ? lastEngine : name; return { engine: name, results: [...lead, ...got].slice(0, 9) }; }
+      if (got.length) { if (name !== "wiki" && !keyed.includes(name)) lastEngine = name; return { engine: name, results: [...lead, ...got].slice(0, 9) }; }
     } catch { /* try the next engine */ }
   }
   return { engine: lead.length ? "news" : "none", results: lead };
@@ -199,6 +217,7 @@ const db = () => g.__vegaDb || {
   update: (t, query, patch) => rest("PATCH", t + "?" + query, patch, "return=minimal"),
   del: (t, query) => rest("DELETE", t + "?" + query, undefined, "return=minimal"),
   rpc: (fn, args) => rest("POST", "rpc/" + fn, args),
+  patch: (t, query, patch) => rest("PATCH", t + "?" + query, patch, "return=representation"),
 };
 
 let vapidCache = null, cronKey = null;
@@ -337,6 +356,30 @@ export async function runCron() {
   return { due: due.length, notified: notify.size, pushed };
 }
 
+// The deck encrypts its state in the browser; this stores only the ciphertext, keyed by a hash of the sync code.
+const SYNC_ID = /^[a-f0-9]{64}$/, SYNC_MAX = 3000000;
+async function state(req, url, origin) {
+  if (req.method === "GET") {
+    const id = url.searchParams.get("id") || "", have = +(url.searchParams.get("rev") || 0);
+    if (!SYNC_ID.test(id)) return fail("Unknown sync id.", 400, origin);
+    const row = (await db().get("vega_sync", "id=eq." + id + "&select=rev,blob"))[0];
+    if (!row) return json({ rev: 0 }, 200, origin);
+    return json(+row.rev === have ? { rev: +row.rev, same: true } : { rev: +row.rev, blob: row.blob }, 200, origin);
+  }
+  let body; try { body = await req.json(); } catch { return fail("Invalid JSON body.", 400, origin); }
+  const id = String((body && body.id) || ""), base = +(body && body.base) || 0, blob = body && body.blob;
+  if (!SYNC_ID.test(id) || typeof blob !== "string" || !blob) return fail("id and blob are required.", 400, origin);
+  if (blob.length > SYNC_MAX) return fail("That is too much to sync. Remove some Library documents or saved conversations.", 413, origin);
+  const now = new Date().toISOString();
+  let saved = null;
+  if (base === 0) { try { saved = (await db().insert("vega_sync", [{ id, blob, rev: 1, updated_at: now }]))[0]; } catch { /* someone else created it first */ } }
+  else saved = (await db().patch("vega_sync", "id=eq." + id + "&rev=eq." + base, { blob, rev: base + 1, updated_at: now }))[0];
+  if (saved) return json({ rev: +saved.rev }, 200, origin);
+  const cur = (await db().get("vega_sync", "id=eq." + id + "&select=rev,blob"))[0];
+  if (!cur) return fail("The sync record is missing. Turn sync off and on again.", 409, origin);
+  return new Response(JSON.stringify({ conflict: true, rev: +cur.rev, blob: cur.blob }), { status: 409, headers: { "Content-Type": "application/json", ...cors(origin) } });
+}
+
 async function background(req, path, url, origin) {
   if (req.method === "GET" && path.endsWith("/push/key")) return json({ key: (await vapid()).pub }, 200, origin);
   if (req.method === "GET" && path.endsWith("/inbox")) {
@@ -382,7 +425,7 @@ export async function handler(req) {
   if (limited(req)) return fail("Too many requests. Wait a minute and try again.", 429, origin);
   const url = new URL(req.url), path = url.pathname.replace(/\/+$/, "");
   try {
-    if (req.method === "GET" && path.endsWith("/health")) return json({ ok: true, tools: ["search", "read"] }, 200, origin);
+    if (req.method === "GET" && path.endsWith("/health")) return json({ ok: true, tools: ["search", "read"], search: env("BRAVE_API_KEY") ? "brave" : env("TAVILY_API_KEY") ? "tavily" : "built-in" }, 200, origin);
     if (req.method === "GET" && path.endsWith("/models")) return json({ data: (await freeModels()).data }, 200, origin);
     if (req.method === "GET" && path.endsWith("/search")) {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 300);
@@ -409,6 +452,7 @@ export async function handler(req) {
       });
       return new Response(up.body, { status: up.status, headers: { "Content-Type": up.headers.get("content-type") || "application/json", "Cache-Control": "no-store", ...cors(origin) } });
     }
+    if (path.endsWith("/state") && (req.method === "GET" || req.method === "POST")) return await state(req, url, origin);
     if (/\/(push\/(key|register|unregister)|jobs\/sync|inbox)$/.test(path)) {
       const r = await background(req, path, url, origin);
       if (r) return r;
