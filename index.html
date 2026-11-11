@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0}</style></head><body>
-<script>window.VEGA_DEFAULTS={"url":"https://openrouter.ai/api/v1","freeOnly":true}</script>
+<script>window.VEGA_DEFAULTS={"url":"https://evtagqjuqgsbvitbvzin.supabase.co/functions/v1/vega-relay","freeOnly":true,"relay":"https://evtagqjuqgsbvitbvzin.supabase.co/functions/v1/vega-relay"}</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <title>VEGA Command Deck</title>
 <style>
@@ -727,6 +727,8 @@ function fail(e){
   else if(c==='not_granted')m='Permission to ask Claude from this page was declined. Reload the page to be asked again.';
   else if(c==='rate_limited')m='Claude is limiting requests from this page for a moment. Wait a few seconds, then press Retry.';
   else if(engine()==='claude'||HOSTED)m='Claude did not answer that one'+(c?' ('+c+')':'')+'. Press Retry.';
+  else if(/no OpenRouter key configured/.test(e&&e.message))m='The relay is running, but its OpenRouter key has not been added yet. Add the secret `OPENROUTER_API_KEY` in the relay\'s Supabase project, then press Retry.';
+  else if(/Only free models are allowed/.test(e&&e.message))m='The relay only allows free models. Pick a free model in **Settings**.';
   else if(/HTTP 429/.test(e&&e.message))m='That model is rate-limited right now, which is common on free models. Wait a moment and press Retry, or pick another free model in Settings.';
   else if(/HTTP 401/.test(e&&e.message))m='The API key was rejected. Check it in **Settings**.';
   else if(/HTTP 402/.test(e&&e.message))m='The provider says this request needs credits. Pick a free model in **Settings**.';

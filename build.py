@@ -14,7 +14,7 @@ No API key is ever written by this script.
 """
 import json, os, pathlib, re
 
-RELAY = os.environ.get("VEGA_RELAY", "").rstrip("/")
+RELAY = os.environ.get("VEGA_RELAY", "https://evtagqjuqgsbvitbvzin.supabase.co/functions/v1/vega-relay").rstrip("/")
 
 root = pathlib.Path(__file__).parent
 src = (root / "src" / "vega.src.html").read_text(encoding="utf-8")
