@@ -512,7 +512,7 @@ async function probe(){
       list=list.filter(isFree).filter(m=>!m.architecture||!m.architecture.output_modalities||m.architecture.output_modalities.includes('text')).sort((a,b)=>rank(a)-rank(b)||(b.context_length||0)-(a.context_length||0))}
     models=list.map(m=>m.id||m.name);
     lats.push(Math.round(performance.now()-t0));if(lats.length>40)lats.shift();online=true;
-    if(models.length&&!models.includes(S.model)){S.model=models[0];save()}
+    const bad0=S.badModels||{};if(models.length&&(!models.includes(S.model)||bad0[S.model]>Date.now())){S.model=models.find(m=>!(bad0[m]>Date.now()))||models[0];save()}
     if(ctxMap[S.model]&&S.ctxAuto!==false)S.ctx=ctxMap[S.model];
   }catch(e){online=false}
   fillModels();setLink();return online}
@@ -530,15 +530,24 @@ function setLink(){
   hello()}
 async function chatEndpoint(messages,onText,signal){
   if(priced&&S.freeOnly&&!freeSet.has(S.model))throw new Error('"'+S.model+'" is not a free model. Pick a free one in Settings.');
-  const order=[S.model,...models.filter(m=>m!==S.model&&(!priced||!S.freeOnly||freeSet.has(m)))].filter(m=>!(busyM[m]>Date.now())).slice(0,3);if(!order.length)order.push(S.model);
+  const bad=S.badModels&&typeof S.badModels==='object'?S.badModels:(S.badModels={}),t0=Date.now();for(const k in bad)if(!(bad[k]>t0))delete bad[k];
+  const order=[S.model,...models.filter(m=>m!==S.model&&(!priced||!S.freeOnly||freeSet.has(m)))].filter(m=>!(busyM[m]>t0)&&!(bad[m]>t0)).slice(0,6);if(!order.length)order.push(S.model);
   /* an image needs a model that can see: route to one automatically */
   if(visionSet.size&&messages.some(m=>Array.isArray(m.content)&&m.content.some(c=>c.type==='image_url'))){const vo=[...order.filter(m=>visionSet.has(m)),...[...visionSet].filter(m=>!order.includes(m))].slice(0,3);
     if(vo.length){if(vo[0]!==S.model)toast('Using '+vo[0].split('/').pop()+' to look at the image.');order.length=0;order.push(...vo)}}
   let r,used;
   for(let i=0;i<order.length;i++){used=order[i];
     r=await fetch(base()+'/chat/completions',{method:'POST',signal,headers:hdr(),body:JSON.stringify({model:used,messages,stream:true,temperature:+S.temp})});
-    if(r.ok||![404,408,429,500,502,503,504].includes(r.status)||i===order.length-1)break;
-    busyM[used]=Date.now()+3e5;toast(used.split('/').pop()+' is busy. Rerouting to '+order[i+1].split('/').pop()+'.')}
+    if(r.ok)break;
+    let why='';try{why=await r.clone().text()}catch(e){}
+    const ours=/Only free models are allowed|no OpenRouter key|Too many requests\. Wait|only answers the VEGA deck/.test(why);
+    /* refused outright (restricted, removed, not offered to this account) vs. merely busy */
+    const refused=!ours&&(r.status===403||r.status===404||(r.status===400&&/model|endpoint|provider|not (available|supported)|no allowed/i.test(why)));
+    const busyNow=!ours&&[408,429,500,502,503,504].includes(r.status);
+    if(refused){bad[used]=Date.now()+864e5;save()}else if(busyNow)busyM[used]=Date.now()+3e5;
+    if(!(refused||busyNow)||i===order.length-1)break;
+    toast(used.split('/').pop()+(refused?' is not available here':' is busy')+'. Rerouting to '+order[i+1].split('/').pop()+'.')}
+  if(r.ok&&used!==S.model&&bad[S.model]>Date.now()){S.model=used;if(ctxMap[used]&&S.ctxAuto!==false)S.ctx=ctxMap[used];save();fillModels();setLink()}
   if(!r.ok)throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,240));
   if(used!==S.model)$('#mdl').textContent=used;
   let full='';
@@ -803,7 +812,9 @@ function fail(e){
   else if(/HTTP 401/.test(e&&e.message))m='The API key was rejected. Check it in **Settings**.';
   else if(/HTTP 402/.test(e&&e.message))m='The provider says this request needs credits. Pick a free model in **Settings**.';
   else if(/not a free model/.test(e&&e.message))m=e.message;
-  else{m=`The model request did not go through: ${e&&e.message||'network error'}\n\nCheck that the server is running, the model is loaded, and that it accepts requests from this page's origin (CORS).`;probe()}
+  else{const raw=String(e&&e.message||''),k=raw.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)/),why=k?k[1].replace(/\\(.)/g,'$1'):'';
+    if(/^HTTP \d+/.test(raw)&&why)m=`None of the available models would take that request. The last one answered: “${why.slice(0,220)}”\n\nPress Retry, or pick a different model in **Settings**.`;
+    else m=`The model request did not go through: ${raw||'network error'}\n\nCheck that the server is running, the model is loaded, and that it accepts requests from this page's origin (CORS).`;probe()}
   tools(addMsg('sys',m),true);setLink()}
 async function mission(obj){
   inMission=true;pendingMission=null;setMode('auto');setBusy(true);ctl=new AbortController();setState('thinking');
