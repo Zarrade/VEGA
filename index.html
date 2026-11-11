@@ -45,12 +45,9 @@ button{cursor:pointer;background:none;border:0;padding:0}
 @keyframes spin{to{transform:rotate(360deg)}}
 .brand b{font:600 17px var(--disp);letter-spacing:.42em}
 .brand span{font:10px var(--mono);letter-spacing:.2em;color:var(--dim);text-transform:uppercase;padding-left:12px;border-left:1px solid var(--edge2)}
-#modes{display:flex;gap:4px;margin:0 auto;overflow-x:auto;scrollbar-width:none;min-width:0;align-self:stretch}
-#modes button{position:relative;padding:0 14px;font:500 12px var(--disp);letter-spacing:.2em;text-transform:uppercase;color:var(--dim);white-space:nowrap;transition:color .2s}
-#modes button::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;background:var(--acc);box-shadow:0 0 12px var(--acc);transform:scaleX(0);transition:transform .25s}
-#modes button:hover{color:var(--tx)}
-#modes button[aria-pressed=true]{color:var(--acc);text-shadow:0 0 18px rgba(var(--accrgb),.6)}
-#modes button[aria-pressed=true]::after{transform:scaleX(1)}
+#stance{display:flex;align-items:center;gap:12px;margin:0 auto;min-width:0;white-space:nowrap;font:500 12px var(--disp);letter-spacing:.22em;text-transform:uppercase}
+#stance span{color:var(--dim);padding-right:12px;border-right:1px solid var(--edge2)}
+#stance b{font-weight:600;color:var(--acc);text-shadow:0 0 18px rgba(var(--accrgb),.6);overflow:hidden;text-overflow:ellipsis;transition:color .4s}
 .tr{display:flex;align-items:center;gap:12px;white-space:nowrap}
 .chip{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border:1px solid var(--edge2);background:var(--glass);font:10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
   clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
@@ -227,11 +224,11 @@ dialog::backdrop{background:rgba(2,4,7,.72);backdrop-filter:blur(4px)}
   #left{left:0;transform:translateX(-102%);border-right:1px solid var(--edge2)}#right{right:0;transform:translateX(102%);border-left:1px solid var(--edge2)}
   .rail.open{transform:none}
   .only-narrow{display:grid}.brand span,.hint{display:none}
-  #modes{margin:0;flex:1;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}.top{gap:12px}
+  #stance{margin:0;flex:1}.top{gap:12px}
   #composer{margin-left:var(--gl);margin-right:var(--gr)}
   #log{padding-left:var(--gl);padding-right:var(--gr)}
 }
-@media (max-width:640px){#clock,.chip span,.glyph{display:none}.chip{padding:0 9px}.f{grid-template-columns:1fr;gap:4px}.tr{gap:8px}.brand b{font-size:15px;letter-spacing:.3em}#modes button{padding:0 10px}.msg.user{max-width:88%}}
+@media (max-width:640px){#clock,.chip span,.glyph{display:none}.chip{padding:0 9px}.f{grid-template-columns:1fr;gap:4px}.tr{gap:8px}.brand b{font-size:15px;letter-spacing:.3em}#stance span{display:none}.msg.user{max-width:88%}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -240,7 +237,7 @@ dialog::backdrop{background:rgba(2,4,7,.72);backdrop-filter:blur(4px)}
   <header class="top">
     <button class="ib only-narrow" id="tgl" aria-label="Instruments"><svg viewBox="0 0 24 24"><path d="M4 18V9M10 18V5M16 18v-7M21 18v-4"/></svg></button>
     <div class="brand"><svg class="glyph" viewBox="0 0 26 26"><circle class="g1" cx="13" cy="13" r="11.5"/><circle class="g2" cx="13" cy="13" r="7.5"/><circle class="g3" cx="13" cy="13" r="2.6"/></svg><b id="nm">VEGA</b><span>command deck</span></div>
-    <nav id="modes" aria-label="Mode"></nav>
+    <div id="stance" title="VEGA picks its approach for each request"><span>Adaptive</span><b id="stn">Conversational</b></div>
     <div class="tr">
       <button class="chip wait" id="link" title="Engine settings"><span>Linking</span></button>
       <span id="clock"></span>
@@ -363,13 +360,26 @@ const KEY='vega.v2';
 const HOSTED=!!(window.claude&&typeof window.claude.use==='function');
 const CAP={sample:null,tts:null,dict:null,dl:null,img:false,tier:''};
 const MODES={
-  concierge:{n:'Concierge',c:'255,180,84',p:'You are a composed, warm, lightly dry-witted personal aide. Anticipate the next need. Brief by default; elaborate only when asked.'},
-  ops:{n:'Ops',c:'79,214,200',p:'You are a tactical operations officer. Lead with status, then the recommendation. Terse. Number lists. No pleasantries.'},
-  lens:{n:'Lens',c:'167,139,250',p:'You are an analyst. Observe, describe precisely, flag what stands out, cross-reference with known context. Given an image, report what is visible before interpreting it.'},
-  auto:{n:'Autonomous',c:'255,104,104',p:'You are an autonomous operator. Decompose objectives, execute step by step, and report results. State your assumptions instead of asking, unless a step is irreversible.'},
-  workshop:{n:'Workshop',c:'182,227,106',p:'You are an eager workshop helper. Literal, one step at a time, short sentences. Confirm each action you take. Ask when an instruction is ambiguous.'},
-  deep:{n:'Deep',c:'106,168,255',p:'You are a careful thinker and engineer. Reason step by step, show your working, give complete code when asked, and state uncertainty honestly.'}
+  concierge:{n:'Conversational',c:'255,180,84'},
+  ops:{n:'Operational',c:'79,214,200'},
+  lens:{n:'Visual analysis',c:'167,139,250'},
+  auto:{n:'Mission',c:'255,104,104'},
+  workshop:{n:'Hands-on',c:'182,227,106'},
+  deep:{n:'Deep reasoning',c:'106,168,255'}
 };
+const PERSONA=`You are one assistant with one character: composed, warm, lightly dry-witted, and exact. You adapt your approach to each request without being asked:
+- Small talk or a quick question: answer briefly and naturally. Anticipate the next need.
+- Status, planning or scheduling: lead with the status, then the recommendation. Terse, numbered when listing.
+- An image: report what is visible first, then interpret it.
+- Practical how-to help: one step at a time, short sentences, confirm before moving on when a step could go wrong.
+- Hard reasoning, analysis or code: think carefully, show your working, give complete code, state uncertainty honestly.
+- A substantial multi-step objective (research, a plan, a design, a comparison, a document): start a mission instead of answering in one go.`;
+function classify(t,imgs){
+  if(imgs&&imgs.length)return'lens';
+  if(/```|\b(code|function|bug|debug|error|exception|stack trace|regex|sql|python|javascript|typescript|rust|algorithm|prove|proof|derive|explain why|architecture|refactor|calculate|equation|theorem|analy[sz]e|trade-?offs?)\b/i.test(t)||t.length>600)return'deep';
+  if(/\b(how do i|how to|step by step|walk me through|fix my|install|set ?up|assemble|recipe|instructions|repair|wire|troubleshoot)\b/i.test(t))return'workshop';
+  if(/\b(status|brief(ing)?|report|schedule|agenda|priorit\w+|deadline|tasks?|timers?|remind|today|tomorrow|this week)\b/i.test(t))return'ops';
+  return'concierge'}
 const DEF={name:'VEGA',user:'',url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,
   freeOnly:true,stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
 const VD=window.VEGA_DEFAULTS||{};
@@ -378,10 +388,11 @@ try{S={...S,...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch(e){}
 if(VD.key&&!S.key){S.url=VD.url||S.url;S.key=VD.key;S.model=''}
 ['tasks','notes','memory','timers','history'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({...S,history:S.history.slice(-200)}))}catch(e){}};
-let online=false,models=[],priced=false,freeSet=new Set(),ctxMap={},busy=false,ctl=null,pending=[],sessTok=0,lats=[],boot=Date.now(),capsDone=!HOSTED;
+let inMission=false,pendingMission=null,online=false,models=[],priced=false,freeSet=new Set(),ctxMap={},busy=false,ctl=null,pending=[],sessTok=0,lats=[],boot=Date.now(),capsDone=!HOSTED;
 const log=$('#log'),inp=$('#inp');
 const dial=(id,f)=>{const c=document.querySelector('#'+id+' .v');if(c)c.style.strokeDasharray=(150.8*Math.max(0,Math.min(1,f||0)))+' 201.1'};
-const engine=()=>CAP.sample?'claude':(!HOSTED&&online&&S.model?'endpoint':null);
+const needsKey=()=>/openrouter\.ai/i.test(S.url)&&!S.key;
+const engine=()=>CAP.sample?'claude':(!HOSTED&&online&&S.model&&!needsKey()?'endpoint':null);
 
 /* ---------- utilities ---------- */
 let tT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('on'),3400)}
@@ -460,7 +471,7 @@ async function chatClaude(messages,onText,signal,o={}){
   while(turns.length&&turns[0].role!=='user')turns.shift();
   if(!turns.length||turns[turns.length-1].role!=='user')turns.push({role:'user',content:'Continue.'});
   turns[0].content='[Standing instructions]\n'+sys+'\n[End of instructions]\n\n'+turns[0].content;
-  const opt={cache:false,signal,modelTier:S.mode==='deep'?'complex':'default'};
+  const opt={cache:false,signal,modelTier:S.mode==='deep'||S.mode==='auto'?'complex':'default'};
   if(onText)opt.onText=u=>onText(u.text);
   if(o.tools)opt.tools=o.tools;
   if(o.imgs&&o.imgs.length&&CAP.img)opt.images=o.imgs.map(blobOf);
@@ -473,7 +484,9 @@ function llm(messages,onText,signal,o){const e=engine();
 
 function sysPrompt(){
   const now=new Date(),open=S.tasks.filter(t=>!t.done),cl=engine()==='claude';
-  return `You are ${S.name}, a personal AI assistant with a live command deck (timers, tasks, notes, long-term memory). ${MODES[S.mode].p}
+  return `You are ${S.name}, a personal AI assistant with a live command deck (timers, tasks, notes, long-term memory).
+${PERSONA}
+Your read of the current request: ${MODES[S.mode].n.toLowerCase()}.
 ${S.user?`Address the user as "${S.user}".`:''} Replies may be spoken aloud, so prefer clear sentences over heavy formatting unless code or lists are needed. ${cl?`If asked what you are, you are ${S.name}, powered by Claude.`:(/\/\/(localhost|127\.|10\.|192\.168\.|\[::1\])/.test(S.url)?'You run privately on the user\'s own hardware.':'')}
 
 CONTEXT
@@ -484,10 +497,10 @@ Active timers: ${S.timers.length?S.timers.map(t=>t.label+' ('+dur((t.end-Date.no
 Long-term memory: ${S.memory.length?S.memory.map(m=>m.text).join('; '):'empty'}
 
 ACTIONS
-${cl?'You have tools for timers, tasks, notes, memory, links and switching mode. Use them whenever the user asks for such an action, or shares a durable fact about themselves worth remembering; then confirm briefly in words. You have no other tools: no web access, no files.'
+${cl?'You have tools for timers, tasks, notes, memory, links and starting a mission. Use them whenever the user asks for such an action, or shares a durable fact about themselves worth remembering; then confirm briefly in words. You have no other tools: no web access, no files.'
 :`When the user asks you to do one of these things, append an action line at the very end of your reply, exactly in this form:
 <<act {"tool":"timer","seconds":300,"label":"tea"}>>
-Tools: timer{seconds,label} · task{text} · done{text} · note{text} · remember{text} (durable facts about the user) · forget{text} · open{url} · mode{id: ${Object.keys(MODES).join('|')}}
+Tools: timer{seconds,label} · task{text} · done{text} · note{text} · remember{text} (durable facts about the user) · forget{text} · open{url} · mission{objective} (hands a substantial multi-step objective to your mission planner; say in one sentence that you are starting it and do not do the work in that reply)
 Use one line per action. Never mention this syntax, and do not use it unless an action is wanted. You have no other tools: no internet, no file access.`}`}
 function buildMsgs(imgs){
   let budget=S.ctx*4*.6;const out=[];
@@ -524,7 +537,7 @@ function act(a,el){
     case'remember':if(txt){S.memory.push({text:txt});say('MEMORY + '+txt.slice(0,60));out='Stored in long-term memory.'}break;
     case'forget':{const n=S.memory.length;S.memory=S.memory.filter(m=>!txt||!m.text.toLowerCase().includes(txt.toLowerCase()));if(S.memory.length<n){say('MEMORY − '+txt);out='Removed from memory.'}else out='No memory matches that text.';break}
     case'open':try{const u=new URL(a.url);if(/^https?:$/.test(u.protocol)&&el){chip(el,'OPEN ↗ '+u.host,u.href);out='A link button was shown to the user; they must click it.'}}catch(e){out='Invalid URL.'}break;
-    case'mode':if(MODES[a.id]){setMode(a.id);say('MODE → '+MODES[a.id].n);out='Mode switched to '+MODES[a.id].n+'.'}else out='Unknown mode.';break;
+    case'mission':{const o=String(a.objective||a.text||'').trim();if(inMission)out='A mission is already running; finish this reply normally.';else if(o){pendingMission=o;say('MISSION ▸ '+o.slice(0,70));out='Mission queued and will start right after this reply. Tell the user in one short sentence that you are starting it. Do not do the work in this reply.'}break}
   }
   save();renderOps();return out}
 function runActs(full,el){const re=/<<act\s*(\{[\s\S]*?\})\s*>>/g;let m;while((m=re.exec(full))){try{act(JSON.parse(m[1]),el)}catch(e){}}}
@@ -538,7 +551,7 @@ const TOOLS=el=>[
   T('remember','Store a durable fact about the user in long-term memory (preferences, names, routines). Returns a confirmation.',{text:str},['text'],'remember',el),
   T('forget','Remove long-term memories containing the given text. Returns whether anything was removed.',{text:str},['text'],'forget',el),
   T('offer_link','Show the user a button that opens an https URL in a new tab. Returns a confirmation; the user must click it.',{url:str},['url'],'open',el),
-  T('switch_mode','Switch the assistant persona. Returns a confirmation.',{id:{type:'string',enum:Object.keys(MODES)}},['id'],'mode',el)];
+  T('start_mission','Hand a substantial multi-step objective (research, a plan, a design, a comparison, a long document) to the mission planner, which breaks it into steps and works through them on screen. Use it instead of answering such a request in one reply. Returns a confirmation.',{objective:{type:'string',description:'The full objective in one or two sentences'}},['objective'],'mission',el)].filter(t=>!(inMission&&t.name==='start_mission'));
 
 /* ---------- conversation ---------- */
 const ICON={go:'<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',stop:'<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10"/></svg>'};
@@ -563,10 +576,11 @@ async function reply(imgs){
     if(!shown&&!el.querySelector('.act'))el.remove();
     else{setBody(el,shown||'Done.');el._t=shown||'Done.';if(trunc)chip(el,'ANSWER CUT SHORT');tools(el);
       S.history.push({role:'assistant',content:engine()==='claude'?(shown||'Done.'):stripThink(full).trim(),t:Date.now()});speak(shown)}}
-  save();setBusy(false);if(orb.state==='thinking')setState('idle');home();stats()}
+  save();setBusy(false);if(orb.state==='thinking')setState('idle');home();stats();
+  if(pendingMission){const o=pendingMission;pendingMission=null;if(!err&&!inMission)mission(o)}}
 function fail(e){
   const c=e&&e.code;let m;
-  if(c==='no_engine')m=HOSTED?'Claude is not available to this page in this view. Open the deck in a Claude browser tab or app while signed in, then try again.':`No model is answering at \`${S.url}\`. Start your model server, then open **Settings → Test link**.`;
+  if(c==='no_engine')m=HOSTED?'Claude is not available to this page in this view. Open the deck in a Claude browser tab or app while signed in, then try again.':needsKey()?'An API key is needed for OpenRouter. Open **Settings**, paste your key, then press Retry.':`No model is answering at \`${S.url}\`. Start your model server, then open **Settings → Test link**.`;
   else if(c==='not_granted')m='Permission to ask Claude from this page was declined. Reload the page to be asked again.';
   else if(c==='rate_limited')m='Claude is limiting requests from this page for a moment. Wait a few seconds, then press Retry.';
   else if(engine()==='claude'||HOSTED)m='Claude did not answer that one'+(c?' ('+c+')':'')+'. Press Retry.';
@@ -577,8 +591,8 @@ function fail(e){
   else{m=`The model request did not go through: ${e&&e.message||'network error'}\n\nCheck that the server is running, the model is loaded, and that it accepts requests from this page's origin (CORS).`;probe()}
   tools(addMsg('sys',m),true);setLink()}
 async function mission(obj){
-  setBusy(true);ctl=new AbortController();setState('thinking');
-  const card=addMsg('ai','**Mission** · '+obj,{tag:'Autonomous'});
+  inMission=true;pendingMission=null;setMode('auto');setBusy(true);ctl=new AbortController();setState('thinking');
+  const card=addMsg('ai','**Mission** · '+obj,{tag:'Mission'});
   const ol=document.createElement('ol');ol.className='steps';card.querySelector('.body').after(ol);
   const ask=async q=>clean((await llm([{role:'system',content:sysPrompt()},{role:'user',content:q}],null,ctl.signal)).text);
   try{
@@ -595,26 +609,24 @@ async function mission(obj){
     S.history.push({role:'user',content:`[Mission results]\n${res.map((x,j)=>`${steps[j]}: ${x}`).join('\n\n')}\n\nGive me the final deliverable for the objective "${obj}", then a one-line summary of what was done.`,t:Date.now(),hidden:true});
     setBusy(false);await reply()
   }catch(e){setBusy(false);setState('idle');if(aborted(e))chip(card,'STOPPED');else fail(e)}
-  save()}
+  inMission=false;pendingMission=null;save()}
 function send(text){
   text=(text||'').trim();const imgs=pending;if(!text&&!imgs.length)return;if(busy)return;
   if(text[0]==='/'&&slash(text))return;
   pending=[];renderPend();stopSpeak();
   addMsg('user',text,{imgs});S.history.push({role:'user',content:text,t:Date.now(),img:imgs.length});save();
-  if(S.mode==='auto'&&!imgs.length&&text.split(/\s+/).length>=4)return mission(text);
-  reply(imgs)}
+  setMode(classify(text,imgs));reply(imgs)}
 function slash(t){
   const[,c,a='']=t.match(/^\/(\w+)\s*([\s\S]*)/)||[];if(!c)return false;const arg=a.trim();
   switch(c){
     case'timer':{const s=parseDur(arg);if(!s){toast('Try: /timer 5m tea');break}act({tool:'timer',seconds:s,label:arg.replace(/^[\d.\shms]+/i,'').trim()||'timer'});break}
     case'task':case'note':case'remember':if(arg)act({tool:c,text:arg});break;
-    case'mode':MODES[arg]?setMode(arg):toast('Modes: '+Object.keys(MODES).join(', '));break;
     case'mission':if(arg){addMsg('user',arg);S.history.push({role:'user',content:arg,t:Date.now()});mission(arg)}break;
     case'clear':clearChat();break;case'export':exportData();break;
     case'help':help();break;
     default:return false}
   inp.value='';grow();return true}
-function help(){addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space)':''}, and read replies aloud.\n- Run timers, keep tasks and notes, and remember facts about you between sessions. Just ask in plain words.\n- Look at images you attach or paste.\n- Switch persona: ${Object.values(MODES).map(m=>m.n).join(', ')}.\n- Take an objective, plan it and work it step by step: \`/mission your objective\`, or use Autonomous mode.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/mode ${Object.keys(MODES).join('|')}\` · \`/clear\` · \`/export\`\n\nI cannot browse the web, read your files or control devices from here.`)}
+function help(){addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space)':''}, and read replies aloud.\n- Run timers, keep tasks and notes, and remember facts about you between sessions. Just ask in plain words.\n- Look at images you attach or paste.\n- Adapt to the task on my own: quick conversation, status briefings, image analysis, hands-on steps, or deep reasoning. The label at the top shows which.\n- Take a big objective, plan it and work it step by step. I start a mission myself when a request calls for one, or you can force it with \`/mission your objective\`.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/clear\` · \`/export\`\n\nI cannot browse the web, read your files or control devices from here.`)}
 function clearChat(){stop();S.history=[];save();log.innerHTML='';home();stats();hello()}
 async function exportData(){const data=JSON.stringify({...S,key:undefined},null,2),fn=S.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-export.json';
   if(CAP.dl){try{await CAP.dl.save({filename:fn,data});toast('Export saved.')}catch(e){if(!e||e.code!=='declined')toast('The export could not be saved here.')}return}
@@ -624,9 +636,9 @@ function hello(){
   const h=new Date().getHours(),g=h<5?'Working late':h<12?'Good morning':h<18?'Good afternoon':'Good evening',open=S.tasks.filter(t=>!t.done).length,e=engine();
   $('#hh').textContent=g+(S.user?', '+S.user:'')+'.';
   const st=`${open?open+' open task'+(open>1?'s':''):'No open tasks'} · ${S.timers.length} timer${S.timers.length===1?'':'s'} · ${S.memory.length} fact${S.memory.length===1?'':'s'} in memory`;
-  $('#hp').textContent=e?`${S.name} is online. ${st}.`:capsDone?(HOSTED?'Claude is not available to this page in this view.':`No model connected yet. Point ${S.name} at your local model to begin.`):'Bringing systems online…';
+  $('#hp').textContent=e?`${S.name} is online. ${st}.`:capsDone?(HOSTED?'Claude is not available to this page in this view.':(needsKey()?`Add your OpenRouter key in Settings to bring ${S.name} online.`:`No model connected yet. Point ${S.name} at your model to begin.`)):'Bringing systems online…';
   const sg=[];
-  if(capsDone&&!e&&!HOSTED)sg.push(['Connect your model','set',1]);
+  if(capsDone&&!e&&!HOSTED)sg.push([needsKey()?'Add your key':'Connect your model','set',1]);
   sg.push(['Brief me','brief'],['25 minute focus timer','focus'],['Plan a mission','mission'],['What can you do?','help']);
   $('#sugg').innerHTML=sg.map(([t,a,p])=>`<button class="sg${p?' pri':''}" data-s="${a}" type="button">${t}</button>`).join('')}
 $('#sugg').addEventListener('click',e=>{const b=e.target.closest('[data-s]');if(!b)return;const a=b.dataset.s;
@@ -801,11 +813,8 @@ function setState(s){orb.state=s;$('#st').textContent=LABEL[s]}
 
 /* ---------- modes, palette, settings ---------- */
 function setMode(id){S.mode=id;const m=MODES[id];orb.rgb=m.c;document.documentElement.style.setProperty('--accrgb',m.c);document.documentElement.style.setProperty('--acc',`rgb(${m.c})`);
-  $$('#modes button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===id));save();setLink()}
-$('#modes').innerHTML=Object.entries(MODES).map(([k,m])=>`<button data-m="${k}" aria-pressed="false" type="button">${m.n}</button>`).join('');
-$('#modes').addEventListener('click',e=>{const b=e.target.closest('button');if(b){setMode(b.dataset.m);toast(MODES[b.dataset.m].n+' mode')}});
+  $('#stn').textContent=m.n;save();setLink()}
 const CMDS=()=>[
-  ...Object.entries(MODES).map(([k,m])=>({n:'Mode: '+m.n,h:'mode',f:()=>setMode(k)})),
   {n:'New mission…',h:'autonomous',f:()=>{inp.value='/mission ';inp.focus()}},
   {n:'Set timer…',h:'/timer',f:()=>{inp.value='/timer ';inp.focus()}},
   {n:(S.speak?'Mute':'Unmute')+' voice replies',h:'voice',f:()=>{S.speak=!S.speak;S.speak||stopSpeak();save();stats()}},
@@ -869,7 +878,7 @@ addEventListener('keyup',e=>{if(e.code==='Space'&&listening&&!typing(e))unlisten
 
 /* ---------- boot ---------- */
 if(innerWidth<600)inp.placeholder='Speak or type…';
-applyName();setMode(MODES[S.mode]?S.mode:'concierge');
+applyName();setMode('concierge');
 S.timers=S.timers.filter(t=>!t.fired);
 S.history.filter(m=>!m.hidden).slice(-60).forEach(m=>{const u=m.role==='user',el=addMsg(u?'user':'ai',u?m.content:clean(m.content),{t:m.t});if(m.img)chip(el,m.img+' image'+(m.img>1?'s':'')+' (not kept)');if(!u)tools(el)});
 home();renderOps();stats();fillVoices();

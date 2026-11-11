@@ -1,6 +1,6 @@
 # VEGA
 
-A single-file AI command deck: a living holographic core, six personas, voice in and out, autonomous missions, timers, tasks, notes and long-term memory. No build step, no dependencies, no backend.
+A single-file AI command deck: a living holographic core, one adaptive assistant, voice in and out, autonomous missions, timers, tasks, notes and long-term memory. No build step, no dependencies, no backend.
 
 ## Run it
 
@@ -15,9 +15,9 @@ It also works with any OpenAI-style endpoint. For a fully private setup point it
 ## What it does
 
 - **Core**: a particle sphere that reacts to listening, thinking and speaking.
-- **Modes**: Concierge, Ops, Lens, Autonomous, Workshop, Deep. Each has its own personality and accent colour.
-- **Actions**: ask in plain words to set timers, add or complete tasks, take notes, remember facts about you, or switch mode. Slash commands do the same: `/timer 5m tea`, `/task`, `/note`, `/remember`, `/mission`, `/mode`, `/clear`, `/export`.
-- **Missions**: Autonomous mode plans an objective, works each step, then delivers the result.
+- **One adaptive assistant**: VEGA reads each request and picks its own approach (conversation, operations, visual analysis, hands-on steps, deep reasoning or a full mission). The deck's accent colour follows.
+- **Actions**: ask in plain words to set timers, add or complete tasks, take notes, remember facts about you, or switch mode. Slash commands do the same: `/timer 5m tea`, `/task`, `/note`, `/remember`, `/mission`, `/clear`, `/export`.
+- **Missions**: for a big objective VEGA plans it, works each step, then delivers the result. It starts one on its own, or use `/mission`.
 - **Voice**: hold Space to talk; replies can be read aloud. Optional wake word.
 - **Vision**: attach, paste or capture an image for a vision-capable model.
 - **Command palette**: Ctrl+K.
