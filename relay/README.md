@@ -7,12 +7,18 @@ A small server-side proxy so the public VEGA page never contains an API key.
 - `GET  /search?q=` — web search results (title, address, snippet).
 - `GET  /read?url=` — the readable text of a public web page. Private and local addresses are refused, including through redirects.
 - `GET  /health`
+- `GET  /push/key`, `POST /push/register`, `POST /push/unregister`, `POST /jobs/sync`, `GET /inbox` — the background service: a device registers a browser push subscription and syncs its timers, sentries and protocol schedules.
+- `POST /cron` — called every minute by the database scheduler with a secret header. Due jobs become inbox items and the device gets an empty push, on which its service worker fetches the inbox.
 
 ## Guard rails
 
 - Only browsers on the origins in `ALLOWED_ORIGINS` are answered (default: `https://zarrade.github.io,http://localhost:8080`). This stops other websites from using your relay. It does not stop a determined person with a script, because an origin can be forged outside a browser.
 - 40 requests per minute per address, best effort.
 - Free models only, so abuse costs rate limit, not money.
+
+## Background service setup
+
+It needs four tables (`vega_config`, `vega_devices`, `vega_jobs`, `vega_inbox`, all with row level security on and no policies, so only the relay's service role can touch them), the `pg_cron` and `pg_net` extensions, and a `pg_cron` job that posts to `/cron` every minute with the `x-cron-key` stored in `vega_config`. The relay creates its own web push signing keys on first use and stores them in `vega_config`. Push notifications carry no content; the text is fetched from the inbox by the device.
 
 ## Deploy on Supabase
 

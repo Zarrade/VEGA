@@ -29,6 +29,9 @@ It also works with any OpenAI-style endpoint. For a fully private setup point it
 - **Sentries**: ask it to keep an eye on a web page and it reports when the page changes (needs the relay, and the deck open).
 - **Screen awareness**: say "look at my screen" to share a capture with a vision-capable model.
 - **Resilience**: if a free model is busy, VEGA reroutes to another one on its own.
+- **Desktop app**: install it from the browser (Chrome or Edge: the install icon in the address bar, or Settings → Desktop app) and it opens in its own window and still starts offline.
+- **Background alerts**: turn them on in Settings and the relay keeps your timers, sentries and protocol schedules, notifying the device through web push even when VEGA is closed.
+- **Wake word**: say the assistant's name to wake it. It tolerates common mishearings and pauses while VEGA itself is speaking.
 - **Missions**: for a big objective VEGA plans it, works each step with its tools, delivers the result and files it in the Library. It starts one on its own, or use `/mission`.
 - **Voice**: hold Space to talk; replies can be read aloud. Optional wake word.
 - **Vision**: attach, paste or capture an image for a vision-capable model.
@@ -46,6 +49,7 @@ It also works with any OpenAI-style endpoint. For a fully private setup point it
 - `index.html` — the standalone deck. Open this.
 - `src/vega.src.html` — the source. It is also what gets published as a hosted page, where it uses the host's built-in model and voice instead of an endpoint.
 - `build.py` — regenerates `index.html` from the source.
+- `sw.js`, `manifest.webmanifest`, `icon-*.png` — the installable app shell.
 - `relay/` — optional server-side relay: keeps the API key off the page, enforces free models, and adds web search and page reading. See `relay/README.md`.
 
 ## Limits

@@ -24,6 +24,8 @@ if RELAY:
     defaults["relay"] = RELAY
 head = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+        '<meta name="theme-color" content="#04070b"><link rel="manifest" href="manifest.webmanifest">'
+        '<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">'
         '<style>body{margin:0}</style></head><body>\n'
         '<script>window.VEGA_DEFAULTS=' + json.dumps(defaults, separators=(",", ":")) + '</script>\n')
 (root / "index.html").write_text(head + src + "\n</body></html>\n", encoding="utf-8")

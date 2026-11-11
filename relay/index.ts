@@ -5,6 +5,8 @@
 // - Allows FREE models only; a paid model is refused before any upstream call.
 // - Adds two web tools the browser cannot do itself: /search and /read.
 // - Only answers browsers on the origins listed in ALLOWED_ORIGINS.
+// - Runs timers, sentries and scheduled protocols in the background and
+//   notifies the installed app through web push.
 //
 // Written as plain JavaScript in a .ts file so it runs unchanged on Supabase
 // Edge Functions (Deno) and can be unit-tested in Node.
@@ -54,6 +56,7 @@ function limited(req) {
 
 // ---- web tools ----
 const UA = "Mozilla/5.0 (compatible; VEGA-relay/1.0)";
+const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 const decode = (s) => s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<")
   .replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#x27;|&#39;|&apos;/g, "'")
   .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n)).replace(/\s+/g, " ").trim();
@@ -68,31 +71,83 @@ function publicUrl(raw) {
   return u;
 }
 
-async function search(q) {
+async function news(q) {
   const out = [];
   try {
-    const r = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q), { headers: { "User-Agent": UA, "Accept-Language": "en" } });
-    const html = await r.text();
-    const re = /<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>([\s\S]*?)(?=<a[^>]*class="[^"]*result__a|$)/g;
-    let m;
-    while ((m = re.exec(html)) && out.length < 6) {
-      let url = m[1].replace(/&amp;/g, "&");
-      const k = url.match(/[?&]uddg=([^&]+)/);
-      if (k) url = decodeURIComponent(k[1]);
-      if (url.startsWith("//")) url = "https:" + url;
-      if (!/^https?:\/\//.test(url) || /duckduckgo\.com\/y\.js/.test(url)) continue;
-      const s = m[3].match(/class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/(?:a|td|div)>/);
-      out.push({ title: decode(m[2]), url, snippet: s ? decode(s[1]) : "" });
+    const r = await fetch("https://news.google.com/rss/search?hl=en&q=" + encodeURIComponent(q), { headers: { "User-Agent": BROWSER_UA } });
+    const xml = await r.text(), re = /<item>([\s\S]*?)<\/item>/g; let m;
+    while ((m = re.exec(xml)) && out.length < 4) {
+      const pick = (t) => decode(((m[1].match(new RegExp("<" + t + "[^>]*>([\\s\\S]*?)</" + t + ">")) || [])[1] || "").replace(/^<!\[CDATA\[|\]\]>$/g, ""));
+      const title = pick("title"), url = pick("link"); if (!title || !/^https?:\/\//.test(url)) continue;
+      out.push({ title, url, snippet: "News, " + pick("pubDate").replace(/ \d\d:\d\d:\d\d.*$/, "") + (pick("source") ? ", " + pick("source") : "") });
     }
-  } catch { /* fall through to the encyclopedia */ }
-  if (!out.length) {
-    try {
-      const r = await fetch("https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=5&srsearch=" + encodeURIComponent(q), { headers: { "User-Agent": UA } });
-      const j = await r.json();
-      for (const p of j.query?.search || []) out.push({ title: p.title, url: "https://en.wikipedia.org/wiki/" + encodeURIComponent(p.title.replace(/ /g, "_")), snippet: decode(p.snippet || "") });
-    } catch { /* nothing found */ }
-  }
+  } catch { /* news is optional */ }
   return out;
+}
+
+const ddgUrl = (href) => {
+  let url = href.replace(/&amp;/g, "&");
+  const k = url.match(/[?&]uddg=([^&]+)/);
+  if (k) url = decodeURIComponent(k[1]);
+  if (url.startsWith("//")) url = "https:" + url;
+  return /^https?:\/\//.test(url) && !/duckduckgo\.com\/y\.js/.test(url) ? url : null;
+};
+const getHtml = async (url) => {
+  const r = await fetch(url, { headers: { "User-Agent": BROWSER_UA, "Accept-Language": "en-US,en;q=0.9", "Accept": "text/html" } });
+  return r.ok ? await r.text() : "";
+};
+const ENGINES = {
+  async ddg(q) {
+    const html = await getHtml("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q)), out = [];
+    const re = /<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>([\s\S]*?)(?=<a[^>]*class="[^"]*result__a|$)/g; let m;
+    while ((m = re.exec(html)) && out.length < 8) {
+      const url = ddgUrl(m[1]); if (!url) continue;
+      const sn = m[3].match(/class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/(?:a|td|div)>/);
+      out.push({ title: decode(m[2]), url, snippet: sn ? decode(sn[1]) : "" });
+    }
+    return out;
+  },
+  async lite(q) {
+    const html = await getHtml("https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(q)), out = [];
+    const re = /<a[^>]*href="([^"]+)"[^>]*class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>([\s\S]*?)(?=<a[^>]*class=['"]result-link|$)/g; let m;
+    while ((m = re.exec(html)) && out.length < 8) {
+      const url = ddgUrl(m[1]); if (!url) continue;
+      const sn = m[3].match(/class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/);
+      out.push({ title: decode(m[2]), url, snippet: sn ? decode(sn[1]) : "" });
+    }
+    return out;
+  },
+  async bing(q) {
+    const html = await getHtml("https://www.bing.com/search?setlang=en&mkt=en-US&q=" + encodeURIComponent(q)), out = [];
+    const re = /<li class="b_algo"[\s\S]*?<h2[^>]*><a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a><\/h2>([\s\S]*?)(?=<li class="b_algo"|$)/g; let m;
+    while ((m = re.exec(html)) && out.length < 8) {
+      let url = m[1].replace(/&amp;/g, "&");
+      const u = url.match(/[?&]u=a1([A-Za-z0-9_-]+)/);
+      if (u) { try { url = atob(u[1].replace(/-/g, "+").replace(/_/g, "/")); } catch { continue; } }
+      if (!/^https?:\/\//.test(url) || /bing\.com\/(ck|aclick)/.test(url)) continue;
+      const sn = m[3].match(/<p[^>]*>([\s\S]*?)<\/p>/);
+      out.push({ title: decode(m[2]), url, snippet: sn ? decode(sn[1]).replace(/^[^·]{0,24}·\s*/, "") : "" });
+    }
+    return out;
+  },
+  async wiki(q) {
+    const r = await fetch("https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=5&srsearch=" + encodeURIComponent(q), { headers: { "User-Agent": UA } });
+    const j = await r.json();
+    return (j.query?.search || []).map((p) => ({ title: p.title, url: "https://en.wikipedia.org/wiki/" + encodeURIComponent(p.title.replace(/ /g, "_")), snippet: decode(p.snippet || "") }));
+  },
+};
+let lastEngine = "ddg";
+async function search(q) {
+  const lead = /\b(news|latest|today|tonight|headlines?|breaking|this week|recent(ly)?|update[sd]?)\b/i.test(q) ? await news(q) : [];
+  // start with whichever engine answered last time, then the rest in order
+  const order = [lastEngine, ...["ddg", "bing", "lite", "wiki"].filter((e) => e !== lastEngine)];
+  for (const name of order) {
+    try {
+      const got = await ENGINES[name](q);
+      if (got.length) { lastEngine = name; return { engine: name, results: [...lead, ...got].slice(0, 9) }; }
+    } catch { /* try the next engine */ }
+  }
+  return { engine: lead.length ? "news" : "none", results: lead };
 }
 
 async function read(raw) {
@@ -123,9 +178,157 @@ async function read(raw) {
   return { url: u.href, title, text: text.slice(0, 12000), truncated: text.length > 12000 };
 }
 
+// ---- background service: devices, scheduled jobs, inbox, web push ----
+// The deck registers a device (a random id plus a browser push subscription) and
+// syncs its timers, sentries and scheduled protocols as jobs. A database cron
+// calls /cron every minute; due jobs are turned into inbox items and the device
+// gets an empty "tickle" push, on which its service worker fetches the inbox.
+const DEVICE = /^[a-f0-9-]{32,80}$/;
+const PUSH_HOSTS = /(^|\.)(fcm\.googleapis\.com|push\.services\.mozilla\.com|notify\.windows\.com|push\.apple\.com)$/;
+const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const q = encodeURIComponent;
+
+async function rest(method, path, body, prefer) {
+  const key = env("SUPABASE_SERVICE_ROLE_KEY");
+  const r = await fetch(env("SUPABASE_URL") + "/rest/v1/" + path, {
+    method, headers: { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const t = await r.text();
+  if (!r.ok) throw new Error("db " + r.status + " " + t.slice(0, 200));
+  return t ? JSON.parse(t) : null;
+}
+const db = () => g.__vegaDb || {
+  get: (t, query) => rest("GET", t + "?" + query),
+  insert: (t, rows) => rest("POST", t, rows, "return=representation"),
+  upsert: (t, rows, on) => rest("POST", t + "?on_conflict=" + on, rows, "resolution=merge-duplicates,return=minimal"),
+  update: (t, query, patch) => rest("PATCH", t + "?" + query, patch, "return=minimal"),
+  del: (t, query) => rest("DELETE", t + "?" + query, undefined, "return=minimal"),
+};
+
+let vapidCache = null, cronKey = null;
+async function vapid() {
+  if (vapidCache) return vapidCache;
+  let rows = await db().get("vega_config", "key=eq.vapid&select=value");
+  if (!rows.length) {
+    const kp = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+    const priv = await crypto.subtle.exportKey("jwk", kp.privateKey), pub = b64u(await crypto.subtle.exportKey("raw", kp.publicKey));
+    try { await db().insert("vega_config", [{ key: "vapid", value: { priv, pub } }]); } catch { /* another instance won the race */ }
+    rows = await db().get("vega_config", "key=eq.vapid&select=value");
+  }
+  return vapidCache = rows[0].value;
+}
+export async function vapidHeader(endpoint) {
+  const v = await vapid();
+  const key = await crypto.subtle.importKey("jwk", v.priv, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const part = (o) => b64u(new TextEncoder().encode(JSON.stringify(o)));
+  const unsigned = part({ typ: "JWT", alg: "ES256" }) + "." + part({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: env("VAPID_SUBJECT", "https://zarrade.github.io/vega/") });
+  const sig = b64u(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(unsigned)));
+  return { header: "vapid t=" + unsigned + "." + sig + ", k=" + v.pub, token: unsigned + "." + sig, pub: v.pub };
+}
+async function pushSend(endpoint) {
+  const { header } = await vapidHeader(endpoint);
+  const r = await fetch(endpoint, { method: "POST", headers: { TTL: "86400", Urgency: "high", Authorization: header, "Content-Length": "0" } });
+  return r.status;
+}
+const validEndpoint = (e) => { try { const u = new URL(e); return u.protocol === "https:" && PUSH_HOSTS.test(u.hostname); } catch { return false; } };
+const textHash = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h); };
+const inbox = (device, item) => db().insert("vega_inbox", [{ device, title: item.title, body: item.body, tag: item.tag, data: item.data || {} }]);
+
+async function syncJobs(device, jobs) {
+  const have = await db().get("vega_jobs", "device=eq." + q(device) + "&select=id,kind,payload,hash");
+  const clean = [];
+  for (const j of (Array.isArray(jobs) ? jobs : []).slice(0, 30)) {
+    const label = String(j.label || "").slice(0, 80);
+    if (j.kind === "timer" || j.kind === "protocol") {
+      const at = +j.at; if (!(at > Date.now() - 6e4) || at > Date.now() + 366 * 864e5) continue;
+      clean.push({ device, kind: j.kind, label, payload: { tag: String(j.tag || "").slice(0, 40) }, next_at: new Date(at).toISOString(), every_min: j.kind === "protocol" ? 1440 : null, hash: null });
+    } else if (j.kind === "watch") {
+      const u = publicUrl(String(j.url || "")); if (!u) continue;
+      const every = Math.max(5, Math.min(1440, Math.round(+j.every || 30)));
+      const old = have.find((h) => h.kind === "watch" && h.payload && h.payload.url === u.href);
+      clean.push({ device, kind: "watch", label, payload: { url: u.href }, next_at: new Date(Date.now() + (old ? every * 6e4 : 0)).toISOString(), every_min: every, hash: old ? old.hash : null });
+    }
+  }
+  if (clean.filter((c) => c.kind === "watch").length > 8) throw new Error("too many sentries");
+  await db().del("vega_jobs", "device=eq." + q(device));
+  if (clean.length) await db().insert("vega_jobs", clean);
+  await db().update("vega_devices", "id=eq." + q(device), { last_seen: new Date().toISOString() });
+  return clean.length;
+}
+
+export async function runCron() {
+  const now = Date.now();
+  const due = await db().get("vega_jobs", "next_at=lte." + q(new Date(now).toISOString()) + "&order=next_at.asc&limit=40&select=*");
+  const notify = new Set();
+  for (const j of due) {
+    try {
+      if (j.kind === "timer") {
+        await inbox(j.device, { title: "VEGA · timer", body: "Timer complete: " + j.label, tag: (j.payload && j.payload.tag) || "t" + j.id, data: { kind: "timer" } });
+        await db().del("vega_jobs", "id=eq." + j.id); notify.add(j.device);
+      } else if (j.kind === "protocol") {
+        await inbox(j.device, { title: "VEGA · " + j.label + " protocol", body: "Scheduled for now. Open VEGA to run it.", tag: "p-" + j.label, data: { kind: "protocol", run: j.label } });
+        let next = Date.parse(j.next_at); while (next <= now) next += 864e5;
+        await db().update("vega_jobs", "id=eq." + j.id, { next_at: new Date(next).toISOString() }); notify.add(j.device);
+      } else if (j.kind === "watch") {
+        let h = null;
+        try { h = textHash((await read(j.payload.url)).text.replace(/\d{1,2}:\d{2}(:\d{2})?/g, "")); } catch { /* unreachable this round */ }
+        if (h != null && j.hash != null && h !== j.hash) {
+          await inbox(j.device, { title: "VEGA · sentry", body: j.label + " has changed.", tag: "w-" + j.id, data: { kind: "watch", url: j.payload.url, label: j.label } }); notify.add(j.device);
+        }
+        await db().update("vega_jobs", "id=eq." + j.id, { next_at: new Date(now + (j.every_min || 30) * 6e4).toISOString(), hash: h ?? j.hash });
+      }
+    } catch { /* one bad job must not stop the rest */ }
+  }
+  let pushed = 0;
+  for (const d of notify) {
+    try {
+      const dev = (await db().get("vega_devices", "id=eq." + q(d) + "&select=endpoint"))[0]; if (!dev) continue;
+      const st = await pushSend(dev.endpoint);
+      if (st === 404 || st === 410) await db().del("vega_devices", "id=eq." + q(d)); else if (st >= 200 && st < 300) pushed++;
+    } catch { /* push service unavailable */ }
+  }
+  if (new Date(now).getUTCMinutes() === 7) {
+    try { await db().del("vega_inbox", "created_at=lt." + q(new Date(now - 3 * 864e5).toISOString())); await db().del("vega_devices", "last_seen=lt." + q(new Date(now - 60 * 864e5).toISOString())); } catch { /* housekeeping can wait */ }
+  }
+  return { due: due.length, notified: notify.size, pushed };
+}
+
+async function background(req, path, url, origin) {
+  if (req.method === "GET" && path.endsWith("/push/key")) return json({ key: (await vapid()).pub }, 200, origin);
+  if (req.method === "GET" && path.endsWith("/inbox")) {
+    const device = url.searchParams.get("device") || ""; if (!DEVICE.test(device)) return fail("Unknown device.", 400, origin);
+    const items = await db().get("vega_inbox", "device=eq." + q(device) + "&order=id.asc&limit=20&select=id,title,body,tag,data");
+    if (items.length) await db().del("vega_inbox", "device=eq." + q(device) + "&id=lte." + items[items.length - 1].id);
+    return json({ items }, 200, origin);
+  }
+  if (req.method !== "POST") return null;
+  let body; try { body = await req.json(); } catch { return fail("Invalid JSON body.", 400, origin); }
+  const device = String((body && body.device) || ""); if (!DEVICE.test(device)) return fail("Unknown device.", 400, origin);
+  if (path.endsWith("/push/register")) {
+    const ep = body.subscription && body.subscription.endpoint; if (!validEndpoint(ep)) return fail("That push address is not from a known browser push service.", 400, origin);
+    await db().upsert("vega_devices", [{ id: device, endpoint: ep, last_seen: new Date().toISOString() }], "id");
+    return json({ ok: true }, 200, origin);
+  }
+  if (path.endsWith("/push/unregister")) { await db().del("vega_devices", "id=eq." + q(device)); return json({ ok: true }, 200, origin); }
+  if (path.endsWith("/jobs/sync")) {
+    if (!(await db().get("vega_devices", "id=eq." + q(device) + "&select=id")).length) return fail("This device is not registered for background alerts.", 404, origin);
+    try { return json({ ok: true, jobs: await syncJobs(device, body.jobs) }, 200, origin); } catch (e) { return fail(e.message || "The jobs could not be saved.", 400, origin); }
+  }
+  return null;
+}
+
 // ---- request handler ----
 export async function handler(req) {
   const origin = (req.headers.get("origin") || "").replace(/\/+$/, "");
+  if (req.method === "POST" && new URL(req.url).pathname.replace(/\/+$/, "").endsWith("/cron")) {
+    // called by the database scheduler, not by a browser
+    try {
+      if (!cronKey) cronKey = ((await db().get("vega_config", "key=eq.cron&select=value"))[0] || {}).value?.key || null;
+      if (!cronKey || req.headers.get("x-cron-key") !== cronKey) return fail("Not allowed.", 403);
+      return json(await runCron(), 200);
+    } catch (e) { return fail("cron failed: " + (e.message || e), 500); }
+  }
   const ok = origins().includes(origin);
   if (req.method === "OPTIONS") return new Response(null, { status: ok ? 204 : 403, headers: ok ? cors(origin) : {} });
   if (!ok) return fail("This relay only answers the VEGA deck.", 403);
@@ -137,7 +340,7 @@ export async function handler(req) {
     if (req.method === "GET" && path.endsWith("/search")) {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 300);
       if (!q) return fail("Missing search text.", 400, origin);
-      return json({ query: q, results: await search(q) }, 200, origin);
+      return json({ query: q, ...(await search(q)) }, 200, origin);
     }
     if (req.method === "GET" && path.endsWith("/read")) {
       try { return json(await read(url.searchParams.get("url") || ""), 200, origin); }
@@ -159,8 +362,13 @@ export async function handler(req) {
       });
       return new Response(up.body, { status: up.status, headers: { "Content-Type": up.headers.get("content-type") || "application/json", "Cache-Control": "no-store", ...cors(origin) } });
     }
+    if (/\/(push\/(key|register|unregister)|jobs\/sync|inbox)$/.test(path)) {
+      const r = await background(req, path, url, origin);
+      if (r) return r;
+    }
     return fail("Not found.", 404, origin);
   } catch (e) {
+    console.error("relay error", path, e && e.message);
     return fail("The relay could not complete that request.", 502, origin);
   }
 }

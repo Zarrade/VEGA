@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0}</style></head><body>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#04070b"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><style>body{margin:0}</style></head><body>
 <script>window.VEGA_DEFAULTS={"url":"https://evtagqjuqgsbvitbvzin.supabase.co/functions/v1/vega-relay","freeOnly":true,"relay":"https://evtagqjuqgsbvitbvzin.supabase.co/functions/v1/vega-relay"}</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <title>VEGA Command Deck</title>
@@ -397,6 +397,11 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
       <div class="f"><label for="k-wake">Wake word</label><input id="k-wake" data-k="wake" type="checkbox"></div>
       <p class="note">The browser's built-in recognition (Chrome, Edge) sends audio to the browser vendor. For fully offline voice, choose the local Whisper endpoint (<code>/audio/transcriptions</code>). Wake word listens for the assistant's name.</p>
     </div>
+    <div id="app-l"><h3>Desktop app</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="instbtn" type="button">Install as an app</button><button class="btn" id="bgbtn" type="button">Turn on background alerts</button></div>
+      <p class="note" id="bgst"></p>
+      <p class="note">Installed, VEGA opens in its own window from your desktop, dock or taskbar. With background alerts on, your relay keeps your timers, sentries and protocol schedules and notifies this device when one is due, even when VEGA is closed. A scheduled protocol runs when you open its notification.</p>
+    </div>
     <h3>Data</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="exp" type="button">Export</button><button class="btn" id="clr" type="button">Clear conversation</button><button class="btn" id="wipe" type="button">Erase everything</button></div>
     <p class="note">Conversation, tasks, notes and memory are kept in this browser only.</p>
@@ -446,13 +451,13 @@ function classify(t,imgs){
   if(/\b(status|brief(ing)?|report|schedule|agenda|priorit\w+|deadline|tasks?|timers?|remind|today|tomorrow|this week)\b/i.test(t))return'ops';
   return'concierge'}
 const DEF={name:'VEGA',user:'boss',home:'',proactive:true,sfx:true,url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,
-  freeOnly:true,web:true,relay:'',stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
+  freeOnly:true,web:true,relay:'',bg:false,device:'',stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
 const VD=window.VEGA_DEFAULTS||{};
 let S={...DEF,...VD};
 let hadSaved=false;try{const raw=localStorage.getItem(KEY);hadSaved=raw!==null;S={...S,...JSON.parse(raw||'{}')}}catch(e){}
 if(VD.key&&!S.key&&(!hadSaved||S.url===VD.url)){S.url=VD.url||S.url;S.key=VD.key;S.model=''}
 ['tasks','notes','memory','timers','history'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({...S,history:S.history.slice(-200)}))}catch(e){}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({...S,history:S.history.slice(-200)}))}catch(e){}syncJobs()};
 if(VD.relay&&!S.relay)S.relay=VD.relay;
 if(VD.relay&&VD.url&&!S.key&&/openrouter\.ai/i.test(S.url)){S.url=VD.url;S.model=''}
 const busyM={};
@@ -661,7 +666,7 @@ function addFiles(files){[...files].forEach(f=>{
   if(f.size>2e6)return toast(f.name+' is too large for the Library (2 MB limit).');
   if(/\.(pdf|docx?|xlsx?|pptx?|zip|png|jpe?g|gif|mp[34]|wav)$/i.test(f.name))return toast(f.name+': only text files can be read here (txt, md, csv, json, code).');
   const r=new FileReader();r.onload=()=>{if(/\u0000/.test(String(r.result).slice(0,2000)))return toast(f.name+' is not a text file.');addDoc(f.name,r.result,'upload');toast('Added to the Library: '+f.name)};r.readAsText(f)})}
-function notify(body){try{if(!HOSTED&&'Notification'in window&&Notification.permission==='granted')new Notification(S.name,{body})}catch(e){}}
+function notify(body,tag){try{if(!HOSTED&&'Notification'in window&&Notification.permission==='granted')new Notification(S.name,{body,tag,icon:'icon-192.png'})}catch(e){}}
 function askNotify(){try{if(!HOSTED&&'Notification'in window&&Notification.permission==='default'){const p=Notification.requestPermission();p&&p.catch&&p.catch(()=>{})}}catch(e){}}
 
 const WMO={0:'clear sky',1:'mainly clear',2:'partly cloudy',3:'overcast',45:'fog',48:'rime fog',51:'light drizzle',53:'drizzle',55:'heavy drizzle',61:'light rain',63:'rain',65:'heavy rain',66:'freezing rain',67:'heavy freezing rain',71:'light snow',73:'snow',75:'heavy snow',77:'snow grains',80:'light showers',81:'showers',82:'violent showers',85:'snow showers',86:'heavy snow showers',95:'thunderstorm',96:'thunderstorm with hail',99:'severe thunderstorm with hail'};
@@ -671,7 +676,11 @@ const RUN={
     const d=new Date();d.setHours(h,mi,0,0);if(d<=new Date())d.setDate(d.getDate()+1);
     act({tool:'timer',seconds:Math.round((d-Date.now())/1000),label:String(a.label||'reminder')},el);return'Reminder set for '+d.toLocaleString([], {weekday:'short',hour:'2-digit',minute:'2-digit'})+'.'},
   async search(a,el){const q=String(a.query||'').trim();if(!q)return'No search text given.';chip(el,'SEARCH ▸ '+q.slice(0,60));
-    const j=await getJSON(rbase()+'/search?q='+enc(q));const rs=j.results||[];if(!rs.length)return'No results found.';
+    const j=await getJSON(rbase()+'/search?q='+enc(q));let rs=j.results||[];
+    /* drop results that share no meaningful word with the question; if nothing relevant is left, use the encyclopedia */
+    const terms=(q.toLowerCase().match(/[a-z0-9\u00c0-\uffff]{4,}/g)||[]).filter(t=>!/^(what|when|where|which|with|from|that|this|have|does|about|latest|news|today|into|your|their|there)$/.test(t));
+    if(terms.length){const rel=rs.filter(r=>/^News,/.test(r.snippet||'')||terms.some(t=>((r.title||'')+' '+(r.snippet||'')+' '+(r.url||'')).toLowerCase().includes(t)));if(!rel.length&&rs.length&&webOK()){try{return'(Web search found nothing relevant, so this is from the encyclopedia.)\n'+await RUN.wiki({query:q},el)}catch(e){}}rs=rel.length?rel:rs}
+    if(!rs.length)return'No results found.';
     rs.slice(0,3).forEach(r=>{try{chip(el,'↗ '+new URL(r.url).host.replace(/^www\./,''),r.url)}catch(e){}});
     return rs.map((r,i)=>`${i+1}. ${r.title}\n${r.url}\n${r.snippet||''}`).join('\n\n')},
   async read(a,el){let u;try{u=new URL(String(a.url||''))}catch(e){return'That is not a valid address.'}if(!/^https?:$/.test(u.protocol))return'Only http and https pages can be read.';
@@ -820,7 +829,7 @@ function slash(t){
     default:return false}
   inp.value='';grow();return true}
 function help(){const web=relayOK()?'- **Search the web and read pages** for current facts, and cite where they came from.\n':'',facts=webOK()?'- Look things up in the **encyclopedia** and check the **weather** anywhere.\n':'';
-  addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space when not typing)':''}, and read replies aloud.\n${web}${facts}- **Calculate exactly** and **run code** in a sandbox for analysis and simulations.\n- Keep a **Library**: add text files and I can read and search them; long work I produce is saved there for you to copy or download.\n- Run **timers and clock-time reminders**, keep **tasks and notes**, and **remember** facts about you between sessions.\n- Look at **images** you attach or paste${HOSTED?'':', or at your screen (say \`look at my screen\`)'}.\n- Put **charts, tables and weather panels** on screen.\n- Run **protocols**: routines you name and trigger with \`run the morning protocol\`, optionally on a daily schedule.\n${relayOK()?'- Post **sentries** on web pages and tell you when they change.\n':''}${convoOK()?'- Hold a hands-free **conversation**: say \`conversation mode\`, and \`that will be all\` to end.\n':''}- **Speak up** on my own: an arrival briefing, low power, lost connection.\n- Take a big objective, plan it, and work it step by step with my tools. I start a mission myself when a request calls for one, or use \`/mission your objective\`.\n\nI choose my approach for each request; the label at the top shows which.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/mission objective\` · \`/clear\` · \`/export\`\n\n${HOSTED?'In this hosted view I cannot reach the internet. ':relayOK()?'':'Web search needs a relay address in Settings. '}I cannot control other apps or devices.`)}
+  addMsg('sys',`**What I can do**\n- Talk with you by text${micOK()?' or voice (hold Space when not typing)':''}, and read replies aloud.\n${web}${facts}- **Calculate exactly** and **run code** in a sandbox for analysis and simulations.\n- Keep a **Library**: add text files and I can read and search them; long work I produce is saved there for you to copy or download.\n- Run **timers and clock-time reminders**, keep **tasks and notes**, and **remember** facts about you between sessions.\n- Look at **images** you attach or paste${HOSTED?'':', or at your screen (say \`look at my screen\`)'}.\n- Put **charts, tables and weather panels** on screen.\n- Run **protocols**: routines you name and trigger with \`run the morning protocol\`, optionally on a daily schedule.\n${relayOK()?'- Post **sentries** on web pages and tell you when they change.\n':''}${convoOK()?'- Hold a hands-free **conversation**: say \`conversation mode\`, and \`that will be all\` to end.\n':''}- **Speak up** on my own: an arrival briefing, low power, lost connection.\n${HOSTED?'':'- Install as a **desktop app** and keep alerting you in the background (Settings → Desktop app).\n'}- Take a big objective, plan it, and work it step by step with my tools. I start a mission myself when a request calls for one, or use \`/mission your objective\`.\n\nI choose my approach for each request; the label at the top shows which.\n\n**Commands** · \`/timer 5m tea\` · \`/task text\` · \`/note text\` · \`/remember fact\` · \`/mission objective\` · \`/clear\` · \`/export\`\n\n${HOSTED?'In this hosted view I cannot reach the internet. ':relayOK()?'':'Web search needs a relay address in Settings. '}I cannot control other apps or devices.`)}
 function clearChat(){epoch++;stop();pendingMission=null;S.history=[];save();log.innerHTML='';home();stats();hello()}
 async function exportData(){const data=JSON.stringify({...S,key:undefined,library:DOCS},null,2),fn=S.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-export.json';
   if(CAP.dl){try{await CAP.dl.save({filename:fn,data});toast('Export saved.')}catch(e){if(!e||e.code!=='declined')toast('The export could not be saved here.')}return}
@@ -833,12 +842,14 @@ function hello(){
   $('#hp').textContent=e?`${S.name} is online. ${wxHome?Math.round(wxHome.c.temperature_2m)+'° and '+wxWord(wxHome.c.weather_code)+' in '+wxHome.l.name+'. ':''}${st}.`:capsDone?(HOSTED?'Claude is not available to this page in this view.':(needsKey()?`Add your OpenRouter key in Settings to bring ${S.name} online.`:`No model connected yet. Point ${S.name} at your model to begin.`)):'Bringing systems online…';
   const sg=[];
   if(capsDone&&!e&&!HOSTED)sg.push([needsKey()?'Add your key':'Connect your model','set',1]);
+  if(installEvt&&!standalone())sg.push(['Install the app','install']);
   sg.push(['Brief me','brief'],relayOK()?['Search the web','web']:['25 minute focus timer','focus'],['Plan a mission','mission'],['What can you do?','help']);
   $('#sugg').innerHTML=sg.map(([t,a,p])=>`<button class="sg${p?' pri':''}" data-s="${a}" type="button">${t}</button>`).join('')}
 $('#sugg').addEventListener('click',e=>{const b=e.target.closest('[data-s]');if(!b)return;const a=b.dataset.s;
   if(a==='set')openSet();else if(a==='help')help();
   else if(a==='focus')act({tool:'timer',seconds:1500,label:'focus'});
   else if(a==='web'){inp.value='Search the web for ';inp.focus()}
+  else if(a==='install')installApp();
   else if(a==='mission'){inp.value='/mission ';inp.focus()}
   else send('Give me a short briefing: the time of day, my open tasks, running timers, recent notes, and what I should focus on next.')});
 
@@ -878,11 +889,11 @@ function stats(){
   $('#s-stt').textContent=CAP.dict?'dictation':HOSTED?'typing only':S.stt==='local'?'local whisper':SR?'browser':'typing only';
   $('#s-vis').textContent=engine()==='claude'?(CAP.img?'images':'off'):'images + camera';
   $('#s-web').textContent=HOSTED?'not in this view':!webOK()?'off':S.relay?'search · pages · facts':'facts · weather';$('#s-code').textContent='sandbox · calculator';
-  $('#s-wake').textContent=S.wake&&SR?'armed · "'+S.name+'"':'off';
+  $('#s-wake').textContent=!S.wake||!SR?'off':wakeRec?'armed · say "'+S.name+'"':wakeNeed?'click once to arm':'starting';
   $('#mic').hidden=!micOK();$('#bcam').hidden=HOSTED;$('#att').hidden=HOSTED&&capsDone&&!CAP.img}
 setInterval(()=>{
   $('#clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  let fired=false;S.timers.forEach(t=>{if(!t.fired&&Date.now()>=t.end){t.fired=fired=true;SFX.alert();toast('Timer complete · '+t.label);notify('Timer complete: '+t.label);speak(`Timer complete: ${t.label}.`)}});if(fired)save();
+  let fired=false;S.timers.forEach(t=>{if(!t.fired&&Date.now()>=t.end){t.fired=fired=true;SFX.alert();toast('Timer complete · '+t.label);notify('Timer complete: '+t.label,'t'+Math.round(t.end));speak(`Timer complete: ${t.label}.`)}});if(fired)save();
   if(S.timers.length)tickTimers()},500);
 setInterval(stats,2000);
 if(!HOSTED){setInterval(()=>{if(!busy&&online)probe()},15000);addEventListener('focus',()=>{if(!online&&!busy)probe()})}
@@ -902,7 +913,7 @@ function stopSpeak(){VQ.said=0;VQ.n=0;if(CAP.tts)CAP.tts.stop().catch(()=>{});el
 const cleanSay=t=>t.replace(/```[\s\S]*?(```|$)/g,' The code is on screen. ').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/https?:\/\/\S+/g,'').replace(/[*_#`>|]/g,'').replace(/\s+/g,' ').trim();
 function sayLine(t){if(!t)return;
   if(CAP.tts){const o={rate:+S.rate||1};if(cvoices.includes(S.voice))o.voice=S.voice;try{Promise.resolve(CAP.tts.add?CAP.tts.add([{text:t.slice(0,1900)}],o):CAP.tts.speak(t.slice(0,1900),o)).catch(e=>{if(e&&e.code==='not_granted'){CAP.tts=null;stats();fillVoices()}})}catch(e){}return}
-  if(!hasSynth)return;const u=new SpeechSynthesisUtterance(t),v=pickVoice();if(v)u.voice=v;u.rate=+S.rate||1;u.pitch=.96;VQ.n++;
+  if(!hasSynth)return;if(wakeRec){try{wakeRec.abort()}catch(e){}}const u=new SpeechSynthesisUtterance(t),v=pickVoice();if(v)u.voice=v;u.rate=+S.rate||1;u.pitch=.96;VQ.n++;
   u.onstart=()=>{if(orb.state!=='listening')setState('speaking')};u.onboundary=()=>orb.spike=1;u.onend=u.onerror=()=>{VQ.n=Math.max(0,VQ.n-1);if(!VQ.n){if(orb.state==='speaking')setState('idle');spokeDone()}};speechSynthesis.speak(u)}
 function sayChunks(t){const lim=CAP.tts?700:240;let cur='';for(const x of t.split(/(?<=[.!?])\s+/)){if(cur&&(cur+' '+x).length>lim){sayLine(cur);cur=x}else cur=cur?cur+' '+x:x}sayLine(cur)}
 function speak(t,force){if((!S.speak&&!force)||!t)return;t=cleanSay(t);if(t)sayChunks(t)}
@@ -913,14 +924,14 @@ async function micOn(){try{micStream=await navigator.mediaDevices.getUserMedia({
 function micOff(){micStream&&micStream.getTracks().forEach(t=>t.stop());actx&&actx.close().catch(()=>{});micStream=actx=an=null;orb.level=0}
 function cap(t){$('#cap').textContent=t||''}
 function listenUI(on){if(on!==listening)(on?SFX.listen:SFX.heard)();listening=on;$('#mic').classList.toggle('on',on);if(on)setState('listening');else if(orb.state==='listening')setState('idle')}
-function listen(){
+function listen(auto){
   if(listening||busy)return;
   if(CAP.dict){dbuf='';stopSpeak();listenUI(true);
     CAP.dict.start().catch(e=>{listenUI(false);const c=e&&e.code;if(c==='not_granted'){toast('Microphone access was declined. Typing still works.');CAP.dict=null;stats()}else if(c!=='dismissed'&&c!=='stopped')toast('Dictation is not available right now.')});return}
   if(HOSTED)return;stopSpeak();
   if(S.stt==='local')return listenLocal();
   if(!SR)return toast('This browser has no speech recognition. Set a local Whisper endpoint in Settings, or type.');
-  wakeRec&&wakeRec.abort();let fin='';rec=new SR();rec.lang=navigator.language||'en-US';rec.interimResults=true;rec.continuous=!S.convo;
+  wakeRec&&wakeRec.abort();let fin='';rec=new SR();rec.lang=navigator.language||'en-US';rec.interimResults=true;rec.continuous=!(S.convo||auto===true);
   rec.onresult=e=>{let it='';for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];r.isFinal?fin+=r[0].transcript:it+=r[0].transcript}cap(fin+it)};
   rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed')toast('Microphone permission was denied.')};
   rec.onend=()=>{micOff();listenUI(false);cap('');rec=null;if(fin.trim()){convoMiss=0;send(fin)}else if(S.convo){if(++convoMiss>=3)setConvo(false);else setTimeout(()=>{if(S.convo&&!busy&&!listening)listen()},400)}armWake()};
@@ -934,13 +945,29 @@ async function listenLocal(){
       if(!r.ok)throw new Error(r.status);const j=await r.json();cap('');send(j.text||'')}catch(e){cap('');toast('The Whisper endpoint did not answer. Check Settings.')}};
   mrec.start();listenUI(true)}
 function unlisten(){if(CAP.dict){CAP.dict.stop().catch(()=>{});return}if(mrec&&mrec.state==='recording')mrec.stop();else rec&&rec.stop()}
+let wakeNeed=false,wakeGesture=false,wakeBack=800;
+function lev(a,b){const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n]}
+/* where the wake word ends in a transcript, or -1. Tolerates the usual mishearings (Vegas, Viga, Bega...). */
+function nameHit(t){const nm=S.name.toLowerCase().replace(/[^a-z0-9]/g,'');if(!nm)return-1;const lim=nm.length<=4?1:nm.length<=7?2:3,soft='vbfwp',re=/[a-z0-9À-￿']+/gi;let m;
+  while((m=re.exec(t))){const w=m[0].toLowerCase().replace(/'s$/,'').replace(/[^a-z0-9]/g,'');if(!w)continue;
+    if(w===nm||(Math.abs(w.length-nm.length)<=lim&&(w[0]===nm[0]||(soft.includes(w[0])&&soft.includes(nm[0])))&&lev(w,nm)<=lim))return m.index+m[0].length}
+  return-1}
+function wakeLabel(){const el=$('#st');if(el&&orb.state==='idle')el.textContent=S.wake&&wakeRec?'Awaiting “'+S.name+'”':LABEL.idle}
 function armWake(){
-  if(HOSTED||!S.wake||!SR||S.stt==='local'||wakeRec||listening)return;
-  const r=wakeRec=new SR();r.lang=navigator.language||'en-US';r.continuous=true;
-  r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(!e.results[i].isFinal)continue;const t=e.results[i][0].transcript,k=t.toLowerCase().indexOf(S.name.toLowerCase());
-    if(k>=0){const q=t.slice(k+S.name.length).replace(/^[\s,.!?]+/,'');if(q)send(q);else{r.abort();setTimeout(listen,150)}}}};
-  r.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){S.wake=false;save();stats();toast('Wake word turned off: microphone permission was denied.')}};
-  r.onend=()=>{wakeRec=null;if(S.wake)setTimeout(armWake,800)};try{r.start()}catch(e){wakeRec=null}}
+  if(HOSTED||!S.wake||!SR||S.stt==='local'||wakeRec||listening||speakingNow())return;
+  const r=wakeRec=new SR();r.lang=navigator.language||'en-US';r.continuous=true;r.interimResults=true;let hit=false;
+  r.onstart=()=>{wakeBack=800;wakeNeed=false;wakeLabel();stats()};
+  r.onresult=e=>{if(hit)return;for(let i=e.resultIndex;i<e.results.length;i++){const res=e.results[i];if(!res.isFinal)continue;const t=res[0].transcript,k=nameHit(t);if(k<0)continue;
+      const q=t.slice(k).replace(/^[\s,.!?]+/,'').trim();hit=true;try{r.abort()}catch(x){}
+      if(q.length>2){SFX.listen();send(q)}else setTimeout(()=>listen(true),150);return}};
+  r.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){if(wakeGesture){S.wake=false;save();toast('Wake word turned off: microphone permission was denied.')}else wakeNeed=true}
+    else if(e.error==='network'||e.error==='audio-capture')wakeBack=Math.min(wakeBack*2,15000)};
+  r.onend=()=>{if(wakeRec===r)wakeRec=null;wakeLabel();stats();if(S.wake&&!wakeNeed)setTimeout(armWake,wakeBack)};
+  try{r.start()}catch(e){wakeRec=null}}
+function wakeTouch(){wakeGesture=true;if(wakeNeed){wakeNeed=false;armWake()}}
+addEventListener('pointerdown',wakeTouch,true);addEventListener('keydown',wakeTouch,true);
+setInterval(()=>{if(S.wake&&!wakeRec&&!wakeNeed&&!listening&&!busy)armWake()},4000);
 
 /* ---------- hosted capabilities ---------- */
 const capsReady=HOSTED?(async()=>{
@@ -959,7 +986,7 @@ const capsReady=HOSTED?(async()=>{
 /* ---------- orb ---------- */
 const orb={state:'idle',amp:.04,spin:.12,ang:0,level:0,spike:0,rgb:MODES.concierge.c};
 const LABEL={idle:'Standby',listening:'Listening',thinking:'Thinking',speaking:'Speaking'};
-function setState(s){orb.state=s;$('#st').textContent=LABEL[s]}
+function setState(s){orb.state=s;$('#st').textContent=LABEL[s];if(s==='idle'&&typeof wakeLabel==='function')wakeLabel()}
 (function(){
   const cv=$('#bg'),x=cv.getContext('2d'),core=$('#core'),N=1500,P=[],fb=new Uint8Array(128),NB=96,bars=new Float32Array(NB);
   let W=0,H=0,D=1,last=0,cx=0,cy=0,R=0,init=false,far=1;
@@ -1033,6 +1060,7 @@ const CMDS=()=>[
   ...(convoOK()?[{n:(S.convo?'End':'Start')+' conversation mode',h:'voice',f:()=>setConvo(!S.convo)}]:[]),
   ...(!HOSTED?[{n:'Show VEGA my screen',h:'vision',f:async()=>{const u=await captureScreen();if(u){pending.push(u);renderPend();inp.focus();toast('Screen captured. Ask about it.')}else toast('No screen was shared.')}}]:[]),
   ...S.protocols.map(p=>({n:'Protocol: '+p.name,h:'protocol',f:()=>runProtocol(p)})),
+  ...(!HOSTED?[{n:'Install '+S.name+' as an app',h:'desktop',f:installApp},{n:(S.bg?'Turn off':'Turn on')+' background alerts',h:'desktop',f:()=>S.bg?bgDisable():bgEnable()}]:[]),
   {n:'Settings',h:'config',f:openSet}];
 let pi=0,pf=[];
 function palRender(){const q=$('#pq').value.toLowerCase();pf=CMDS().filter(c=>(c.n+c.h).toLowerCase().includes(q));pi=Math.min(pi,Math.max(0,pf.length-1));
@@ -1042,15 +1070,15 @@ function palRun(i){const c=pf[i];$('#pal').close();c&&c.f()}
 $('#pq').addEventListener('input',()=>{pi=0;palRender()});
 $('#pq').addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();pi=(pi+(e.key==='ArrowDown'?1:-1)+pf.length)%Math.max(1,pf.length);palRender();const s=$('#pl .sel');s&&s.scrollIntoView({block:'nearest'})}else if(e.key==='Enter'){e.preventDefault();palRun(pi)}});
 $('#pl').addEventListener('click',e=>{const li=e.target.closest('[data-i]');li&&palRun(+li.dataset.i)});
-function openSet(){$('#eng-h').hidden=!HOSTED;$('#eng-l').hidden=HOSTED;$('#stt-l').hidden=HOSTED;$('#web-l').hidden=HOSTED;$('#exp').hidden=HOSTED&&!CAP.dl;
+function openSet(){$('#eng-h').hidden=!HOSTED;$('#eng-l').hidden=HOSTED;$('#stt-l').hidden=HOSTED;$('#web-l').hidden=HOSTED;bgUI();$('#exp').hidden=HOSTED&&!CAP.dl;
   fillVoices();fillModels();$$('[data-k]').forEach(i=>{const v=S[i.dataset.k];if(i.type==='checkbox')i.checked=!!v;else if(i.id!=='vsel'&&i.id!=='msel')i.value=v});
   $('#testr').textContent='';$('#wipe').textContent='Erase everything';$('#set').showModal()}
 $('#set').addEventListener('change',e=>{const i=e.target.closest('[data-k]');if(!i)return;const k=i.dataset.k;S[k]=i.type==='checkbox'?i.checked:i.type==='number'||i.type==='range'?+i.value:i.value.trim();
-  if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='home'){wxAt=0;wxHome=null;homeWeather()}if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){S.wake?armWake():wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
+  if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='home'){wxAt=0;wxHome=null;homeWeather()}if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){wakeGesture=true;wakeNeed=false;if(S.wake){if(!SR)toast('This browser has no speech recognition, so the wake word cannot listen. Use Chrome or Edge.');armWake()}else wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
   if(k==='rate'&&CAP.tts)CAP.tts.setRate(S.rate).catch(()=>{});save();setLink();stats()});
 $('#test').onclick=async()=>{const r=$('#testr');r.textContent='testing…';r.style.color='var(--dim)';const ok=await probe();r.textContent=ok?`ready · ${models.length} model${models.length===1?'':'s'} · ${lats[lats.length-1]} ms`:'no answer. Is the server running, with CORS allowed?';r.style.color=ok?'var(--ok)':'var(--amber)'};
-$('#exp').onclick=exportData;$('#clr').onclick=()=>{clearChat();$('#set').close()};
-let wipeArm=0;$('#wipe').onclick=e=>{if(Date.now()-wipeArm<4000){epoch++;stop();pendingMission=null;try{localStorage.removeItem(KEY)}catch(x){}S={...DEF,...VD,tasks:[],notes:[],memory:[],timers:[],history:[]};DOCS=[];try{localStorage.removeItem(KEY+'.docs')}catch(x){}renderDocs();seedProtocols();renderPresence();wxHome=null;$('#set').close();applyName();setMode('concierge');try{localStorage.removeItem(KEY)}catch(x){}log.innerHTML='';home();renderOps();stats();probe();toast('Everything erased.')}else{wipeArm=Date.now();e.target.textContent='Press again to erase'}};
+$('#exp').onclick=exportData;$('#instbtn').onclick=installApp;$('#bgbtn').onclick=()=>S.bg?bgDisable():bgEnable();$('#clr').onclick=()=>{clearChat();$('#set').close()};
+let wipeArm=0;$('#wipe').onclick=e=>{if(Date.now()-wipeArm<4000){epoch++;stop();pendingMission=null;if(S.bg)bgDisable();try{localStorage.removeItem(KEY)}catch(x){}S={...DEF,...VD,tasks:[],notes:[],memory:[],timers:[],history:[]};DOCS=[];try{localStorage.removeItem(KEY+'.docs')}catch(x){}renderDocs();seedProtocols();renderPresence();wxHome=null;$('#set').close();applyName();setMode('concierge');try{localStorage.removeItem(KEY)}catch(x){}log.innerHTML='';home();renderOps();stats();probe();toast('Everything erased.')}else{wipeArm=Date.now();e.target.textContent='Press again to erase'}};
 $$('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 $$('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 function applyName(){$('#nm').textContent=S.name.toUpperCase()}
@@ -1105,7 +1133,7 @@ const today=()=>new Date().toLocaleDateString('en-CA');
 
 /* an assistant line VEGA says on its own initiative */
 function announce(text,tag,opts={}){if(busy&&!opts.force)return false;const el=addMsg('ai',text,{tag:tag||'Alert'});tools(el);S.history.push({role:'assistant',content:text,t:Date.now()});save();
-  if(opts.sound!==false)SFX.alert();notify(text.replace(/[*_`#]/g,''));speak(text);if(opts.chips)suggestChips(el,opts.chips);return el}
+  if(opts.sound!==false)SFX.alert();if(!opts.silent){notify(text.replace(/[*_`#]/g,''));speak(text)}if(opts.chips)suggestChips(el,opts.chips);return el}
 function suggestChips(el,list){if(!el)return;let box=el.querySelector('.sgns');if(!box){box=document.createElement('div');box.className='sgns';el.querySelector('.acts').after(box)}
   box.innerHTML=list.slice(0,3).map(t=>`<button class="sgn" type="button" data-say="${esc(String(t).slice(0,160))}">${esc(String(t).slice(0,160))}</button>`).join('')}
 
@@ -1147,7 +1175,7 @@ function renderPresence(){const pl=$('#protos');if(!pl)return;
   $('#watches').innerHTML=S.watches.map((w,i)=>`<li><span title="${esc(w.url)}">${esc(w.label)}</span><small>every ${w.every} min</small><button class="x" data-wdel="${i}" aria-label="Stop watching">✕</button></li>`).join('')||'<li class="empty" style="border:0">watching nothing</li>';
   $('#n-wt').textContent=S.watches.length||''}
 const hash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return h};
-async function patrol(){if(!relayOK()||!navigator.onLine)return;
+async function patrol(){if(S.bg||!relayOK()||!navigator.onLine)return;
   for(const w of S.watches){if(Date.now()-(w.last||0)<w.every*6e4)continue;w.last=Date.now();
     try{const j=await getJSON(rbase()+'/read?url='+enc(w.url)),h=hash(String(j.text||'').replace(/\d{1,2}:\d{2}(:\d{2})?/g,''));
       if(w.hash!=null&&h!==w.hash)announce(`**Sentry** · ${w.label} has changed since I last looked.`,'Sentry',{chips:['Read '+w.url+' and tell me what is new']});w.hash=h}catch(e){}}
@@ -1171,7 +1199,7 @@ let convoMiss=0;
 const convoOK=()=>!HOSTED&&!!SR&&S.stt!=='local';
 function setConvo(on){if(on&&!convoOK())return toast('Conversation mode needs browser speech recognition.');S.convo=!!on;convoMiss=0;$('#mic').classList.toggle('convo',S.convo);
   toast(S.convo?'Conversation mode on. Say "that will be all" to end.':'Conversation mode off.');if(S.convo){S.speak=true;stats();if(!listening&&!busy)listen()}else if(listening)unlisten()}
-function spokeDone(){if(S.convo&&!busy&&!listening&&!document.querySelector('dialog[open]'))setTimeout(()=>{if(S.convo&&!busy&&!listening&&!speakingNow())listen()},350)}
+function spokeDone(){setTimeout(armWake,400);if(S.convo&&!busy&&!listening&&!document.querySelector('dialog[open]'))setTimeout(()=>{if(S.convo&&!busy&&!listening&&!speakingNow())listen()},350)}
 
 /* instant intents: things that should not wait for a model */
 function instant(text){
@@ -1233,6 +1261,52 @@ async function arrival(){
   const p=findProto('morning');if(!p||busy)return;S.lastBrief=today();save();
   const h=new Date().getHours();addMsg('user','▸ Arrival briefing');S.history.push({role:'user',content:`[Arrival briefing] The user has just opened the deck (${h<12?'morning':h<18?'afternoon':'evening'}). Brief them in under 90 words: greet them, the day and time, weather at their home location if known (use the weather tool), open tasks and running timers, and one recommendation. If there is little to report, say so in one or two lines.`,t:Date.now(),hidden:true});setMode('ops');reply()}
 
+/* ---------- desktop app + background service ---------- */
+var swReg=null,installEvt=null,jobSig='',jobT=0;
+const canSW=()=>!HOSTED&&'serviceWorker'in navigator&&/^(https:|http:\/\/(localhost|127\.0\.0\.1)[:/])/.test(location.href);
+const canPush=()=>canSW()&&'PushManager'in window&&'Notification'in window&&!!S.relay;
+const standalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: window-controls-overlay)').matches||navigator.standalone===true}catch(e){return false}};
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;bgUI();hello()});
+addEventListener('appinstalled',()=>{installEvt=null;toast(S.name+' is installed.');bgUI();hello()});
+async function installApp(){
+  if(standalone())return toast(S.name+' is already running as an app.');
+  if(installEvt){const ev=installEvt;installEvt=null;try{ev.prompt();await ev.userChoice}catch(e){}bgUI();hello();return}
+  toast(canSW()?'Use the browser menu: "Install '+S.name+'", or the install icon in the address bar.':'Open the web version in Chrome or Edge to install it.')}
+const b64bytes=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');const b=atob(s+'==='.slice((s.length+3)%4)),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a};
+async function postJSON(u,body){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>null);if(!r.ok)throw new Error((j&&j.error&&j.error.message)||('the service answered with status '+r.status));return j}
+function swCfg(){try{const w=swReg&&(swReg.active||swReg.waiting||swReg.installing);if(w&&S.relay)w.postMessage({type:'cfg',cfg:{relay:rbase(),device:S.device||''}})}catch(e){}}
+async function swInit(){if(!canSW())return bgUI();
+  try{swReg=await navigator.serviceWorker.register('./sw.js');await navigator.serviceWorker.ready;navigator.serviceWorker.addEventListener('message',onSW);swCfg();
+    if(S.bg){const sub=await swReg.pushManager.getSubscription();if(!sub){S.bg=false;save()}else{syncJobs(true);pullInbox()}}}catch(e){swReg=null}
+  bgUI()}
+async function bgEnable(){
+  if(!canPush())return toast(canSW()?'Background alerts need the relay address in Settings.':'Background alerts need the web version, opened in Chrome or Edge.');
+  try{if(!swReg)await swInit();if(!swReg)throw new Error('the app shell could not be loaded');
+    const perm=await Notification.requestPermission();if(perm!=='granted'){toast('Notifications were not allowed, so background alerts stay off.');return bgUI()}
+    const key=(await getJSON(rbase()+'/push/key')).key,sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64bytes(key)});
+    if(!S.device)S.device=crypto.randomUUID?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
+    await postJSON(rbase()+'/push/register',{device:S.device,subscription:sub.toJSON()});S.bg=true;save();swCfg();syncJobs(true);toast('Background alerts are on.')}
+  catch(e){toast('Background alerts could not be turned on: '+(e&&e.message||'unknown reason')+'.')}
+  bgUI()}
+async function bgDisable(){const dev=S.device,rb=S.relay?rbase():'';S.bg=false;save();bgUI();
+  try{const sub=swReg&&await swReg.pushManager.getSubscription();sub&&await sub.unsubscribe()}catch(e){}
+  try{dev&&rb&&await postJSON(rb+'/push/unregister',{device:dev})}catch(e){}toast('Background alerts are off.')}
+function nextAt(hm){const[h,m]=String(hm).split(':').map(Number),d=new Date();d.setHours(h,m,0,0);if(d<=new Date())d.setDate(d.getDate()+1);return d.getTime()}
+function syncJobs(force){try{if(HOSTED||!S.bg||!S.device||!S.relay)return;clearTimeout(jobT);jobT=setTimeout(async()=>{
+  const jobs=[...S.timers.filter(t=>!t.fired&&t.end>Date.now()).map(t=>({kind:'timer',label:t.label,at:Math.round(t.end),tag:'t'+Math.round(t.end)})),
+    ...(S.watches||[]).map(w=>({kind:'watch',label:w.label,url:w.url,every:w.every})),
+    ...(S.protocols||[]).filter(p=>p.at).map(p=>({kind:'protocol',label:p.name,at:nextAt(p.at),hm:p.at}))];
+  const sig=JSON.stringify(jobs.map(j=>[j.kind,j.label,j.url||'',j.kind==='protocol'?j.hm:j.at,j.every||'']));if(sig===jobSig&&!force)return;
+  try{await postJSON(rbase()+'/jobs/sync',{device:S.device,jobs});jobSig=sig}catch(e){if(/not registered/.test(e.message)){S.bg=false;save();bgUI()}}},force?200:2500)}catch(e){}}
+function handleItem(it,quiet){const d=(it&&it.data)||{};
+  if(d.kind==='watch')announce('**Sentry** · '+String(it.body||(d.label||'A watched page')+' has changed.'),'Sentry',{force:true,silent:!!quiet,sound:!quiet,chips:d.url?['Read '+d.url+' and tell me what is new']:undefined});
+  else if(d.kind==='protocol'||d.run){const p=findProto(d.run);if(p&&p.ran!==today()&&!busy)Promise.resolve(ensureEngine()).then(ok=>{if(ok&&!busy&&p.ran!==today()){p.ran=today();save();runProtocol(p,true)}})}}
+async function pullInbox(){if(HOSTED||!S.bg||!S.device||!S.relay||!navigator.onLine)return;try{const j=await getJSON(rbase()+'/inbox?device='+enc(S.device));(j.items||[]).forEach(i=>handleItem(i))}catch(e){}}
+function onSW(e){const m=e.data||{};if(m.type==='inbox')pullInbox();else if(m.type==='inbox-items')(m.items||[]).forEach(i=>handleItem(i,true));else if(m.type==='open'&&m.data)handleItem({data:m.data})}
+function bgUI(){const b=$('#bgbtn');if(!b)return;$('#app-l').hidden=HOSTED;b.textContent=S.bg?'Turn off background alerts':'Turn on background alerts';$('#instbtn').hidden=standalone();
+  $('#bgst').textContent=!canSW()?'Install and background alerts work in the web version, opened in Chrome or Edge.':S.bg?'Background alerts are on: timers, sentries and protocol schedules reach this device even when '+S.name+' is closed.':standalone()?'Running as an installed app. Background alerts are off.':'Not installed on this device yet.'}
+addEventListener('focus',()=>pullInbox());
+
 /* ---------- boot ---------- */
 if(innerWidth<600)inp.placeholder='Speak or type…';
 applyName();setMode('concierge');
@@ -1241,7 +1315,9 @@ S.history.filter(m=>!m.hidden).slice(-60).forEach(m=>{const u=m.role==='user',el
 seedProtocols();S.convo=false;home();renderOps();renderDocs();renderPresence();stats();fillVoices();
 if(!HOSTED)probe().then(()=>{stats();armWake()});
 booted=true;if(innerWidth>1080)inp.focus();
-bootLines();arrival();setInterval(sentinel,30000);
+bootLines();arrival();setInterval(sentinel,30000);swInit();
+function runHash(){if(HOSTED||location.hash.indexOf('#run-')!==0)return;const rn=decodeURIComponent(location.hash.slice(5));try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}handleItem({data:{kind:'protocol',run:rn}})}
+runHash();addEventListener('hashchange',runHash);
 </script>
 
 </body></html>
