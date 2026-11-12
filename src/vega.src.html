@@ -591,7 +591,7 @@ async function chatEndpoint(messages,onText,signal,depth){
     let why='';try{why=await r.clone().text()}catch(e){}
     const ours=/Only free models are allowed|no OpenRouter key|Too many requests\. Wait|only answers the VEGA deck/.test(why);
     /* refused outright (restricted, removed, not offered to this account) vs. merely busy */
-    const refused=!ours&&(r.status===403||r.status===404||(r.status===400&&/model|endpoint|provider|not (available|supported)|no allowed/i.test(why)));
+    const refused=!ours&&(r.status===403||r.status===404||(r.status===400&&/model|endpoint|provider|not (available|supported)|no allowed|block|prohibit|moderat|flagged/i.test(why)));
     const busyNow=!ours&&[408,429,500,502,503,504].includes(r.status);
     if(refused){bad[used]=Date.now()+864e5;noteModel(used,false);save()}else if(busyNow){busyM[used]=Date.now()+3e5;noteModel(used,false)}
     if(!(refused||busyNow)||i===order.length-1)break;
@@ -605,7 +605,9 @@ async function chatEndpoint(messages,onText,signal,depth){
   const rd=r.body.getReader(),dec=new TextDecoder();let buf='';
   for(;;){const{done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
     while((i=buf.indexOf('\n'))>=0){const ln=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!ln.startsWith('data:'))continue;const d=ln.slice(5).trim();if(d==='[DONE]')continue;
-      let j=null;try{j=JSON.parse(d)}catch(e){}if(!j)continue;if(j.error)throw new Error(j.error.message||'the provider returned an error');const c=j.choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}}}
+      let j=null;try{j=JSON.parse(d)}catch(e){}if(!j)continue;if(j.error){const pm=String(j.error.message||(j.error.metadata&&j.error.metadata.raw)||'the provider returned an error');try{rd.cancel()}catch(e){}
+        if(!stripThink(full).trim()&&!(signal&&signal.aborted)&&(depth||0)<4&&models.length>1){if(/block|prohibit|safety|moderat|flagged|policy/i.test(pm))bad[used]=Date.now()+864e5;else busyM[used]=Date.now()+3e5;noteModel(used,false);save();toast(used.split('/').pop()+' would not answer. Trying another model.');return chatEndpoint(messages,onText,signal,(depth||0)+1)}
+        throw new Error('provider: '+pm)}const c=j.choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}}}
   const rest=(buf+dec.decode()).trim();if(rest.startsWith('data:')){const d=rest.slice(5).trim();if(d!=='[DONE]'){try{const c=JSON.parse(d).choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}}catch(e){}}}
   if(!stripThink(full).trim()&&!(signal&&signal.aborted)&&(depth||0)<2&&models.length>1){busyM[used]=Date.now()+3e5;noteModel(used,false);return chatEndpoint(messages,onText,signal,(depth||0)+1)}
   return{text:full}}
@@ -865,7 +867,8 @@ function fail(e){
   else if(/HTTP 402/.test(e&&e.message))m='The provider says this request needs credits. Pick a free model in **Settings**.';
   else if(/not a free model/.test(e&&e.message))m=e.message;
   else{const raw=String(e&&e.message||''),k=raw.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)/),why=k?k[1].replace(/\\(.)/g,'$1'):'';
-    if(/^HTTP \d+/.test(raw)&&why)m=`None of the available models would take that request. The last one answered: “${why.slice(0,220)}”\n\nPress Retry, or pick a different model in **Settings**.`;
+    if(/^provider: /.test(raw))m=`The models I tried would not answer that one. The last said: “${raw.slice(10,230)}”\n\nPress Retry and I will route it to a different model.`;
+    else if(/^HTTP \d+/.test(raw)&&why)m=`None of the available models would take that request. The last one answered: “${why.slice(0,220)}”\n\nPress Retry, or pick a different model in **Settings**.`;
     else m=`The model request did not go through: ${raw||'network error'}\n\nCheck that the server is running, the model is loaded, and that it accepts requests from this page's origin (CORS).`;probe()}
   tools(addMsg('sys',m),true);setLink()}
 async function mission(obj){
