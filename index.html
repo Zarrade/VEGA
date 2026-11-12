@@ -870,6 +870,8 @@ function fail(e){
   else{const raw=String(e&&e.message||''),k=raw.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)/),why=k?k[1].replace(/\\(.)/g,'$1'):'';
     if(/^provider: /.test(raw))m=`The models I tried would not answer that one. The last said: “${raw.slice(10,230)}”\n\nPress Retry and I will route it to a different model.`;
     else if(/^HTTP \d+/.test(raw)&&why)m=`None of the available models would take that request. The last one answered: “${why.slice(0,220)}”\n\nPress Retry, or pick a different model in **Settings**.`;
+    else if(!navigator.onLine)m='This device is offline, so I cannot reach a model. Timers, the Library and calculations still work.';
+    else if(S.relay||/openrouter\.ai/.test(S.url||''))m=`I could not reach the model service (${raw.slice(0,160)||'network error'}). It is usually brief. Press Retry in a moment.`;
     else m=`The model request did not go through: ${raw||'network error'}\n\nCheck that the server is running, the model is loaded, and that it accepts requests from this page's origin (CORS).`;probe()}
   tools(addMsg('sys',m),true);setLink()}
 async function mission(obj){
