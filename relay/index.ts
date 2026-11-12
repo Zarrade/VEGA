@@ -20,7 +20,7 @@ const env = (k, d = "") => {
 };
 const origins = () => env("ALLOWED_ORIGINS", "https://zarrade.github.io,http://localhost:8080")
   .split(",").map((s) => s.trim().replace(/\/+$/, "")).filter(Boolean);
-const MAX_TOKENS = 4096, MAX_BODY = 8 * 1024 * 1024, PER_MIN = 40;
+const MAX_TOKENS = 4096, MAX_BODY = 8 * 1024 * 1024, PER_MIN = 120; // the deck asks several models at once
 
 const cors = (origin) => ({
   "Access-Control-Allow-Origin": origin,

@@ -397,6 +397,7 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
       <div class="f"><label for="k-key">API key (optional)</label><input id="k-key" data-k="key" type="password" autocomplete="off"></div>
       <div class="f"><label for="msel">Model</label><select data-k="model" id="msel"></select></div>
       <div class="f"><label for="k-free">Free models only</label><input id="k-free" data-k="freeOnly" type="checkbox"></div>
+      <div class="f"><label for="k-fanout">Models at once</label><select id="k-fanout" data-k="fanout"><option value="1">1 · gentlest on free limits</option><option value="2">2</option><option value="3">3 · fastest replies</option><option value="4">4</option></select></div>
       <div class="f"><label for="k-temp">Temperature</label><input id="k-temp" data-k="temp" type="number" min="0" max="2" step="0.1"></div>
       <div class="f"><label for="k-ctx">Context window</label><input id="k-ctx" data-k="ctx" type="number" min="1024" step="1024"></div>
       <div class="f"><span></span><div><button class="btn" id="test" type="button">Test link</button> <span id="testr" style="font:11px var(--mono);margin-left:8px"></span></div></div>
@@ -521,7 +522,7 @@ function classify(t,imgs){
   if(/\b(how do i|how to|step by step|walk me through|fix my|install|set ?up|assemble|recipe|instructions|repair|wire|troubleshoot)\b/i.test(t))return'workshop';
   if(/\b(status|brief(ing)?|report|schedule|agenda|priorit\w+|deadline|tasks?|timers?|remind|today|tomorrow|this week)\b/i.test(t))return'ops';
   return'concierge'}
-const DEF={name:'VEGA',user:'sir',home:'',proactive:true,sfx:true,lowfx:false,url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,vengine:'system',nvoice:'bm_george',
+const DEF={name:'VEGA',user:'sir',fanout:3,home:'',proactive:true,sfx:true,lowfx:false,url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,vengine:'system',nvoice:'bm_george',
   freeOnly:true,auto:true,web:true,relay:'',bg:false,device:'',stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
 const VD=window.VEGA_DEFAULTS||{};
 try{const o=JSON.parse(localStorage.getItem('vega.v2')||'{}');if(o.user==='boss'&&!o.userSet){o.user='sir';localStorage.setItem('vega.v2',JSON.stringify(o))}}catch(e){}
@@ -639,18 +640,22 @@ async function chatEndpoint(messages,onText,signal,depth){
     if(refused){bad[m]=Date.now()+864e5;noteModel(m,false);save()}else if(busyNow){busyM[m]=Date.now()+3e5;noteModel(m,false)}
     return ours?'stop':'next'};
   const tStart=performance.now(),HEDGE=hasImg?15000:8000,MAXW=90000,abortErr=()=>Object.assign(new Error('aborted'),{name:'AbortError'});
-  let next=0,live=[],win=null,lastErr=null;const launch=()=>{const s=attempt(order[next++]);live.push(s);return s};launch();
+  const fan=Math.max(1,Math.min(4,Math.round(+S.fanout||1)));
+  let next=0,live=[],win=null,lastErr=null;const launch=()=>{const s=attempt(order[next++]);live.push(s);return s};
+  /* the free router is the safety net, so it is not part of the opening volley unless little else is left */
+  const opening=Math.min(fan,Math.max(1,order.filter(m=>m!==ROUTER).length));for(let k=0;k<opening&&next<order.length;k++)launch();
+  if(live.length>1)$('#mdl').textContent=live.length+' models racing';
   while(!win){if(signal&&signal.aborted){live.forEach(s=>s.ac.abort());throw abortErr()}
     if(!live.length){if(next<order.length){launch();continue}break}
     const left=MAXW-(performance.now()-tStart);if(left<=0){live.forEach(s=>s.ac.abort());lastErr=new Error('The free models are all slow to answer right now.');break}
-    const wait=next<order.length&&live.length<3?Math.min(HEDGE,left):left;
+    const cap=Math.max(3,fan+1),wait=next<order.length&&live.length<cap?Math.min(HEDGE,left):left;
     const res=await Promise.race([...live.map(s=>s.ready.then(()=>({s}),e=>({s,e}))),new Promise(r=>setTimeout(()=>r({tick:1}),wait))]);
-    if(res.tick){if(next<order.length&&live.length<3){const n=launch();toast(live[0].model.split('/').pop()+' is slow to start. Asking '+n.model.split('/').pop()+' too.')}continue}
+    if(res.tick){if(next<order.length&&live.length<cap){const n=launch();if(fan<2)toast(live[0].model.split('/').pop()+' is slow to start. Asking '+n.model.split('/').pop()+' too.')}continue}
     live=live.filter(x=>x!==res.s);
     if(res.e){if(signal&&signal.aborted){live.forEach(s=>s.ac.abort());throw abortErr()}lastErr=res.e;const v=verdict(res.s.model,res.e);if(v==='stop'){live.forEach(s=>s.ac.abort());break}
       if(!live.length&&next<order.length)toast(res.s.model.split('/').pop()+(bad[res.s.model]>Date.now()?' is not available here':' is busy')+'. Rerouting to '+order[next].split('/').pop()+'.');continue}
     win=res.s}
-  live.forEach(s=>{if(s!==win){busyM[s.model]=Date.now()+12e4;s.ac.abort()}});
+  live.forEach(s=>{if(s!==win)s.ac.abort()});
   if(!win)throw lastErr||new Error('No model answered.');
   const used=win.model,r=win.r;noteModel(used,true,performance.now()-win.t0);
   if(used!==S.model&&!hasImg&&(S.auto!==false||bad[S.model]>Date.now())){S.model=used;if(ctxMap[used]&&S.ctxAuto!==false)S.ctx=ctxMap[used];save();fillModels();setLink()}
@@ -1028,7 +1033,7 @@ function stats(){
   $('#h-bat').textContent=bat?Math.round(bat.level*100)+'%'+(bat.charging?' · charging':''):'—';
   $('#h-net').textContent=navigator.onLine?((navigator.connection&&navigator.connection.effectiveType)||'online'):'offline';
   $('#h-up').textContent=dur((Date.now()-boot)/1000);
-  $('#s-tts').textContent=!S.speak?'muted':CAP.tts?'Claude voice':neuralPicked()?(NV.ready?'Bella':NV.failed?'unavailable here':NV.loading?'Bella (loading)':'Bella'):hasSynth?'system voice':'text only';
+  $('#s-tts').textContent=!S.speak?'muted':CAP.tts?'Claude voice':neuralPicked()?(NV.ready?(nvSlow()?'built-in (Bella too slow here)':'Bella'):NV.failed?(hasSynth?'built-in voice':'unavailable here'):NV.loading?(hasSynth?'built-in until Bella loads':'Bella (loading)'):'Bella'):hasSynth?'system voice':'text only';
   $('#s-stt').textContent=CAP.dict?'dictation':HOSTED?'typing only':S.stt==='local'?'local whisper':SR?'browser':'typing only';
   $('#s-vis').textContent=engine()==='claude'?(CAP.img?'images':'off'):priced&&!visionSet.size?'no free vision model now':'images · camera · screen';
   $('#s-web').textContent=HOSTED?'not in this view':!webOK()?'off':S.relay?'search · pages · facts':'facts · weather';$('#s-code').textContent='sandbox · calculator';
@@ -1045,7 +1050,7 @@ if(!HOSTED){setInterval(()=>{if(!busy&&online)probe()},15000);addEventListener('
 let voices=[],cvoices=[],rec=null,wakeRec=null,listening=false,micStream=null,actx=null,an=null,mrec=null,dbuf='';
 /* how good a system voice is likely to sound: natural/neural ones first, British English preferred */
 function voiceScore(v){const n=v.name,en=/^en/i.test(v.lang);let sc=en?10:0;if(/natural|neural/i.test(n))sc+=60;if(/premium|enhanced|siri/i.test(n))sc+=40;if(/^en-GB/i.test(v.lang))sc+=8;
-  if(/Google UK English Male/i.test(n))sc+=30;if(/\b(Ryan|Thomas|Oliver|Arthur|George|Daniel)\b/i.test(n))sc+=12;if(/\b(Sonia|Libby|Emma|Aria|Jenny|Samantha|Serena|Kate)\b/i.test(n))sc+=6;return sc}
+  if(/Google US English/i.test(n))sc+=30;if(/\b(Aria|Jenny|Ava|Samantha|Allison|Michelle|Zira|Emma|Sonia|Libby|Serena|Kate)\b/i.test(n))sc+=14;if(/\b(male|Ryan|Thomas|Oliver|Arthur|George|Daniel|Guy|David|Mark)\b/i.test(n))sc-=10;if(/^en-US/i.test(v.lang))sc+=6;return sc}
 const NVOICES=[['af_bella','Bella']];
 const neuralPicked=()=>!HOSTED&&!CAP.tts;   /* the standalone deck has one voice: Bella, generated in the browser */
 function fillVoices(){const s=$('#vsel');if(!s)return;s.dataset.k=neuralPicked()?'nvoice':'voice';
@@ -1055,7 +1060,7 @@ function fillVoices(){const s=$('#vsel');if(!s)return;s.dataset.k=neuralPicked()
     s.innerHTML=`<option value="">Automatic${best&&!S.voice?': '+esc(best.name):''}</option>`+list.map(v=>`<option value="${esc(v.name)}"${v.name===S.voice?' selected':''}>${esc(v.name)} · ${v.lang}${/natural|neural|premium|enhanced/i.test(v.name)?' · natural':''}${v.localService?'':' · cloud'}</option>`).join('')}
   const row=s.closest('.f'),fx=$('#vfixed');if(row)row.hidden=neuralPicked();if(fx)fx.hidden=!neuralPicked()}
 if(hasSynth)try{speechSynthesis.onvoiceschanged=fillVoices}catch(e){}
-const VQ={said:0,n:0};let vAuto=null;
+const VQ={said:0,n:0,eng:''};let vAuto=null;
 function pickVoice(){if(!hasSynth)return null;if(!voices.length)voices=speechSynthesis.getVoices();const v=voices.find(v=>v.name===S.voice);if(v)return v;if(vAuto&&voices.includes(vAuto))return vAuto;
   const en=voices.filter(v=>/^en/i.test(v.lang)).sort((a,b)=>voiceScore(b)-voiceScore(a));return vAuto=en[0]||null}
 
@@ -1065,9 +1070,12 @@ function pickVoice(){if(!hasSynth)return null;if(!voices.length)voices=speechSyn
 const NVW=`import{KokoroTTS}from'https://cdn.jsdelivr.net/npm/kokoro-js@1.2.0/+esm';let tts=null;
 self.onmessage=async e=>{const m=e.data;try{
   if(m.type==='load'){if(!tts)tts=await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8',device:'wasm',progress_callback:x=>{if(x&&x.status==='progress'&&x.total>5e6)self.postMessage({type:'progress',pc:Math.floor(x.loaded/x.total*10)*10})}});self.postMessage({type:'ready'})}
-  else if(m.type==='say'){const a=await tts.generate(m.text,{voice:'af_bella',speed:m.speed||1}),raw=a&&(a.audio||a.data),f=raw instanceof Float32Array?raw:Float32Array.from(raw||[]);self.postMessage({type:'audio',id:m.id,gen:m.gen,rate:(a&&(a.sampling_rate||a.sample_rate))||24000,data:f},[f.buffer])}
+  else if(m.type==='say'){const t0=performance.now(),a=await tts.generate(m.text,{voice:'af_bella',speed:m.speed||1}),raw=a&&(a.audio||a.data),f=raw instanceof Float32Array?raw:Float32Array.from(raw||[]);self.postMessage({type:'audio',id:m.id,gen:m.gen,ms:performance.now()-t0,rate:(a&&(a.sampling_rate||a.sample_rate))||24000,data:f},[f.buffer])}
 }catch(err){self.postMessage({type:'error',stage:m.type,id:m.id,gen:m.gen,message:String(err&&err.message||err)})}};`;
-const NV={w:null,ready:false,loading:null,failed:false,gen:0,seq:0,order:[],got:new Map(),wait:[],playing:false,src:null,ctx:null};
+const NV={w:null,ready:false,loading:null,failed:false,gen:0,seq:0,order:[],got:new Map(),wait:[],playing:false,src:null,ctx:null,rtf:null,slowAt:0};
+/* Bella has to generate speech faster than it is spoken, or replies would be heard long after they are read.
+   rtf = seconds of work per second of speech. Above 1 on this machine, the built-in voice speaks instead, and Bella is retried later. */
+function nvSlow(){if(NV.rtf!=null&&NV.rtf>1.05){if(Date.now()-NV.slowAt>3e5){NV.rtf=null;return false}return true}return false}
 const neuralOK=()=>neuralPicked()&&!NV.failed&&typeof Worker==='function';
 function nvFail(){NV.failed=true;NV.ready=false;NV.loading=null;NV.wait.length=0;NV.order.length=0;NV.got.clear();try{NV.w&&NV.w.terminate()}catch(e){}NV.w=null;if(orb.state==='speaking')setState('idle');stats()}
 function nvLoad(){if(NV.ready)return Promise.resolve();if(NV.loading)return NV.loading;let seen=-1;
@@ -1077,7 +1085,8 @@ function nvLoad(){if(NV.ready)return Promise.resolve();if(NV.loading)return NV.l
       w.onmessage=e=>{const m=e.data||{};
         if(m.type==='progress'){if(m.pc>seen){seen=m.pc;toast('Fetching the voice: '+m.pc+'%')}}
         else if(m.type==='ready'){NV.ready=true;toast('Voice ready.');stats();NV.wait.splice(0).forEach(x=>{if(x[0]===NV.gen)nvSay(x[1])});res()}
-        else if(m.type==='audio'){if(m.gen===NV.gen){NV.got.set(m.id,m);nvPlay()}}
+        else if(m.type==='audio'){const sec=m.data&&m.data.length/(m.rate||24000);if(sec>.4&&m.ms>0){const r=m.ms/1000/sec;NV.rtf=NV.rtf==null?r:NV.rtf*.6+r*.4;if(NV.rtf>1.05)NV.slowAt=Date.now();stats()}
+          if(m.gen===NV.gen){NV.got.set(m.id,m);nvPlay()}}
         else if(m.type==='error'){if(m.stage==='load')rej(new Error(m.message));else if(m.gen===NV.gen){NV.got.set(m.id,{id:m.id,data:null});nvPlay()}}};
       w.postMessage({type:'load'})})
     .catch(e=>{nvFail();toast('The voice could not be loaded on this device, so replies are text only for now.');throw e})}
@@ -1096,10 +1105,18 @@ function stopSpeak(){VQ.said=0;VQ.n=0;NV.gen++;NV.order.length=0;NV.got.clear();
 const cleanSay=t=>t.replace(/```[\s\S]*?(```|$)/g,' The code is on screen. ').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/https?:\/\/\S+/g,'').replace(/[*_#`>|]/g,'').replace(/\s+/g,' ').trim();
 function sayLine(t){if(!t)return;
   if(CAP.tts){const o={rate:+S.rate||1};if(cvoices.includes(S.voice))o.voice=S.voice;try{Promise.resolve(CAP.tts.add?CAP.tts.add([{text:t.slice(0,1900)}],o):CAP.tts.speak(t.slice(0,1900),o)).catch(e=>{if(e&&e.code==='not_granted'){CAP.tts=null;stats();fillVoices()}})}catch(e){}return}
-  if(neuralPicked()){if(neuralOK()){if(NV.ready)nvSay(t);else{if(NV.wait.length<6)NV.wait.push([NV.gen,t]);nvLoad().catch(()=>{})}}return}   /* one voice only: text until it is ready */
+  if(neuralPicked()){
+    /* each reply is spoken by one engine from start to finish: Bella when she is ready and quick enough here, otherwise the built-in voice at once */
+    const quiet=!NV.playing&&!NV.order.length&&!NV.wait.length&&!(hasSynth&&(speechSynthesis.speaking||speechSynthesis.pending));
+    if(quiet||!VQ.eng)VQ.eng=neuralOK()&&NV.ready&&!nvSlow()?'bella':hasSynth?'system':'bella';
+    if(neuralOK()&&!NV.ready&&!NV.loading)nvLoad().catch(()=>{});
+    if(VQ.eng==='bella'){if(neuralOK()){if(NV.ready)nvSay(t);else if(NV.wait.length<6)NV.wait.push([NV.gen,t])}return}}
   if(!hasSynth)return;if(wakeRec){try{wakeRec.abort()}catch(e){}}const u=new SpeechSynthesisUtterance(t),v=pickVoice();if(v)try{u.voice=v}catch(e){}u.rate=+S.rate||1;u.pitch=.96;VQ.n++;
   u.onstart=()=>{if(orb.state!=='listening')setState('speaking')};u.onboundary=()=>orb.spike=1;u.onend=u.onerror=()=>{VQ.n=Math.max(0,VQ.n-1);if(!VQ.n){if(orb.state==='speaking')setState('idle');spokeDone()}};speechSynthesis.speak(u)}
-function sayChunks(t){const lim=CAP.tts?700:240;let cur='';for(const x of t.split(/(?<=[.!?])\s+/)){if(cur&&(cur+' '+x).length>lim){sayLine(cur);cur=x}else cur=cur?cur+' '+x:x}sayLine(cur)}
+function sayChunks(t){const nv=neuralPicked(),lim=CAP.tts?700:nv?150:240,parts=t.split(/(?<=[.!?])\s+/);let first=nv&&!speakingNow(),cur='';
+  /* the generated voice starts sooner on a short opening phrase */
+  if(first&&parts[0]&&parts[0].length>80){const p0=parts[0],k=p0.slice(25,90).search(/[,;:\u2013\u2014]\s/);if(k>=0){const c=25+k+1;parts.splice(0,1,p0.slice(0,c),p0.slice(c).trim())}}
+  for(const x of parts){if(cur&&(first||(cur+' '+x).length>lim)){sayLine(cur);cur=x;first=false}else cur=cur?cur+' '+x:x}sayLine(cur)}
 function speak(t,force){if((!S.speak&&!force)||!t)return;t=cleanSay(t);if(t)sayChunks(t)}
 function sayStream(full,final){if(!S.speak)return;let t=full||'';
   if(!final){if((t.match(/```/g)||[]).length%2)t=t.slice(0,t.lastIndexOf('```'));const m=t.match(/^[\s\S]*[.!?:]\s/);t=m?m[0]:''}
