@@ -294,7 +294,7 @@ export async function runProtocolJob(job, ctx) {
   for (const m of models) {
     try {
       const r = await fetch(OR + "/chat/completions", { method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "X-Title": "VEGA" },
-        body: JSON.stringify({ model: m.id, max_tokens: 500, temperature: 0.6, messages: [{ role: "system", content: system }, { role: "user", content: 'Run the "' + job.label + '" protocol: ' + steps }] }) });
+        body: JSON.stringify({ model: m.id, max_tokens: 1600, temperature: 0.6, reasoning: { effort: "low", exclude: true }, messages: [{ role: "system", content: system }, { role: "user", content: 'Run the "' + job.label + '" protocol: ' + steps }] }) });
       if (!r.ok) continue;
       const j = await r.json(), text = String(j.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<<act[\s\S]*?>>/g, "").trim();
       if (text.length > 12) return text.slice(0, 2400);
@@ -455,6 +455,9 @@ export async function handler(req) {
       if (!(await freeModels()).ids.has(body.model)) return fail("Only free models are allowed on this relay.", 403, origin);
       const send = { model: body.model, messages: body.messages, stream: !!body.stream, max_tokens: Math.min(+body.max_tokens || MAX_TOKENS, MAX_TOKENS) };
       if (typeof body.temperature === "number") send.temperature = Math.max(0, Math.min(2, body.temperature));
+      // reasoning models: only the effort level passes through, nothing else from the client
+      const eff = body.reasoning && body.reasoning.effort;
+      if (["minimal", "low", "medium", "high"].includes(eff)) send.reasoning = { effort: eff };
       const up = await fetch(OR + "/chat/completions", {
         method: "POST", signal: req.signal,
         headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json", "X-Title": "VEGA" },

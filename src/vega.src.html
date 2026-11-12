@@ -585,37 +585,57 @@ async function chatEndpoint(messages,onText,signal,depth){
   const hasImg=messages.some(m=>Array.isArray(m.content)&&m.content.some(c=>c.type==='image_url'));
   if(visionSet.size&&hasImg){const vo=[...order.filter(m=>visionSet.has(m)),...[...visionSet].filter(m=>!order.includes(m))].slice(0,3);
     if(vo.length){if(vo[0]!==S.model)toast('Using '+vo[0].split('/').pop()+' to look at the image.');order.length=0;order.push(...vo)}}
-  let r,used,tReq=0;
-  for(let i=0;i<order.length;i++){used=order[i];tReq=performance.now();
-    const ac=new AbortController(),onAb=()=>ac.abort();if(signal){if(signal.aborted)ac.abort();else signal.addEventListener('abort',onAb,{once:true})}
-    let slow=false;const tmo=setTimeout(()=>{slow=true;ac.abort()},i===order.length-1?60000:35000);
-    try{r=await fetch(base()+'/chat/completions',{method:'POST',signal:ac.signal,headers:hdr(),body:JSON.stringify({model:used,messages,stream:true,temperature:+S.temp})})}
-    catch(e){clearTimeout(tmo);if(signal)signal.removeEventListener('abort',onAb);
-      if(slow&&!(signal&&signal.aborted)&&i<order.length-1){busyM[used]=Date.now()+3e5;noteModel(used,false);toast(used.split('/').pop()+' is slow to answer. Trying '+order[i+1].split('/').pop()+'.');continue}
-      throw slow?new Error('The free models are all slow to answer right now.'):e}
-    clearTimeout(tmo);if(signal)signal.removeEventListener('abort',onAb);
-    if(r.ok)break;
-    let why='';try{why=await r.clone().text()}catch(e){}
+  /* Free models are often slow to start. Ask the best one; if it is still silent after a few seconds,
+     ask the next one as well and keep whichever starts answering first. The others are cancelled. */
+  const viaOR=!!S.relay||/openrouter\.ai/.test(S.url||'');
+  const bodyFor=m=>JSON.stringify(Object.assign({model:m,messages,stream:true,temperature:+S.temp},viaOR?{reasoning:{effort:S.mode==='deep'?'medium':'low'}}:{}));
+  const attempt=m=>{const ac=new AbortController(),onAb=()=>ac.abort(),st={model:m,ac,t0:performance.now(),pre:[],buf:''};
+    if(signal){if(signal.aborted)ac.abort();else signal.addEventListener('abort',onAb,{once:true})}
+    st.ready=(async()=>{const r=await fetch(base()+'/chat/completions',{method:'POST',signal:ac.signal,headers:hdr(),body:bodyFor(m)});st.r=r;
+      if(!r.ok){const why=await r.text().catch(()=>'');throw Object.assign(new Error('HTTP '+r.status+' '+why.slice(0,240)),{status:r.status,why})}
+      if(!(r.headers.get('content-type')||'').includes('event-stream')){st.json=await r.json();return st}
+      st.rd=r.body.getReader();st.dec=new TextDecoder();
+      for(;;){const{done,value}=await st.rd.read();if(done){st.done=true;st.buf+=st.dec.decode();return st}
+        st.buf+=st.dec.decode(value,{stream:true});let i,live=false;
+        while((i=st.buf.indexOf('\n'))>=0){const ln=st.buf.slice(0,i).trim();st.buf=st.buf.slice(i+1);if(!ln.startsWith('data:'))continue;const d=ln.slice(5).trim();if(d==='[DONE]')continue;
+          let j=null;try{j=JSON.parse(d)}catch(e){}if(!j)continue;st.pre.push(j);const dl=j.choices&&j.choices[0]&&j.choices[0].delta||{};if(j.error||dl.content||dl.reasoning||dl.reasoning_content)live=true}
+        if(live)return st}})();
+    st.ready.then(()=>{},()=>{}).finally(()=>signal&&signal.removeEventListener('abort',onAb));return st};
+  const verdict=(m,e)=>{const why=String(e&&e.why||''),st=e&&e.status||0;
     const ours=/Only free models are allowed|no OpenRouter key|Too many requests\. Wait|only answers the VEGA deck/.test(why);
-    /* refused outright (restricted, removed, not offered to this account) vs. merely busy */
-    const refused=!ours&&(r.status===403||r.status===404||(r.status===400&&/model|endpoint|provider|not (available|supported)|no allowed|block|prohibit|moderat|flagged/i.test(why)));
-    const busyNow=!ours&&[408,429,500,502,503,504].includes(r.status);
-    if(refused){bad[used]=Date.now()+864e5;noteModel(used,false);save()}else if(busyNow){busyM[used]=Date.now()+3e5;noteModel(used,false)}
-    if(!(refused||busyNow)||i===order.length-1)break;
-    toast(used.split('/').pop()+(refused?' is not available here':' is busy')+'. Rerouting to '+order[i+1].split('/').pop()+'.')}
-  if(r.ok)noteModel(used,true,performance.now()-tReq);
-  if(r.ok&&used!==S.model&&!hasImg&&(S.auto!==false||bad[S.model]>Date.now())){S.model=used;if(ctxMap[used]&&S.ctxAuto!==false)S.ctx=ctxMap[used];save();fillModels();setLink()}
-  if(!r.ok)throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,240));
+    const refused=!ours&&(st===403||st===404||(st===400&&/model|endpoint|provider|not (available|supported)|no allowed|block|prohibit|moderat|flagged/i.test(why)));
+    const busyNow=!ours&&(!st||[408,429,500,502,503,504].includes(st));
+    if(refused){bad[m]=Date.now()+864e5;noteModel(m,false);save()}else if(busyNow){busyM[m]=Date.now()+3e5;noteModel(m,false)}
+    return ours?'stop':'next'};
+  const tStart=performance.now(),HEDGE=hasImg?15000:8000,MAXW=90000,abortErr=()=>Object.assign(new Error('aborted'),{name:'AbortError'});
+  let next=0,live=[],win=null,lastErr=null;const launch=()=>{const s=attempt(order[next++]);live.push(s);return s};launch();
+  while(!win){if(signal&&signal.aborted){live.forEach(s=>s.ac.abort());throw abortErr()}
+    if(!live.length){if(next<order.length){launch();continue}break}
+    const left=MAXW-(performance.now()-tStart);if(left<=0){live.forEach(s=>s.ac.abort());lastErr=new Error('The free models are all slow to answer right now.');break}
+    const wait=next<order.length&&live.length<3?Math.min(HEDGE,left):left;
+    const res=await Promise.race([...live.map(s=>s.ready.then(()=>({s}),e=>({s,e}))),new Promise(r=>setTimeout(()=>r({tick:1}),wait))]);
+    if(res.tick){if(next<order.length&&live.length<3){const n=launch();toast(live[0].model.split('/').pop()+' is slow to start. Asking '+n.model.split('/').pop()+' too.')}continue}
+    live=live.filter(x=>x!==res.s);
+    if(res.e){if(signal&&signal.aborted){live.forEach(s=>s.ac.abort());throw abortErr()}lastErr=res.e;const v=verdict(res.s.model,res.e);if(v==='stop'){live.forEach(s=>s.ac.abort());break}
+      if(!live.length&&next<order.length)toast(res.s.model.split('/').pop()+(bad[res.s.model]>Date.now()?' is not available here':' is busy')+'. Rerouting to '+order[next].split('/').pop()+'.');continue}
+    win=res.s}
+  live.forEach(s=>{if(s!==win){busyM[s.model]=Date.now()+12e4;s.ac.abort()}});
+  if(!win)throw lastErr||new Error('No model answered.');
+  const used=win.model,r=win.r;noteModel(used,true,performance.now()-win.t0);
+  if(used!==S.model&&!hasImg&&(S.auto!==false||bad[S.model]>Date.now())){S.model=used;if(ctxMap[used]&&S.ctxAuto!==false)S.ctx=ctxMap[used];save();fillModels();setLink()}
   if(used!==S.model)$('#mdl').textContent=used;
   let full='';
-  if(!(r.headers.get('content-type')||'').includes('event-stream')){const j=await r.json();full=j.choices?.[0]?.message?.content||'';onText&&onText(full);return{text:full}}
-  const rd=r.body.getReader(),dec=new TextDecoder();let buf='';
-  for(;;){const{done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
+  if(win.json){full=win.json.choices?.[0]?.message?.content||'';onText&&onText(full);return{text:full}}
+  const eat=j=>{if(j.error){const pm=String(j.error.message||(j.error.metadata&&j.error.metadata.raw)||'the provider returned an error');try{win.rd.cancel()}catch(e){}
+      if(!stripThink(full).trim()&&!(signal&&signal.aborted)&&(depth||0)<4&&models.length>1){if(/block|prohibit|safety|moderat|flagged|policy/i.test(pm))bad[used]=Date.now()+864e5;else busyM[used]=Date.now()+3e5;noteModel(used,false);save();toast(used.split('/').pop()+' would not answer. Trying another model.');return{retry:true}}
+      throw new Error('provider: '+pm)}
+    const c=j.choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}};
+  for(const j of win.pre){const x=eat(j);if(x&&x.retry)return chatEndpoint(messages,onText,signal,(depth||0)+1)}
+  let buf=win.buf;
+  if(!win.done)for(;;){const{done,value}=await win.rd.read();if(done)break;buf+=win.dec.decode(value,{stream:true});let i;
     while((i=buf.indexOf('\n'))>=0){const ln=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!ln.startsWith('data:'))continue;const d=ln.slice(5).trim();if(d==='[DONE]')continue;
-      let j=null;try{j=JSON.parse(d)}catch(e){}if(!j)continue;if(j.error){const pm=String(j.error.message||(j.error.metadata&&j.error.metadata.raw)||'the provider returned an error');try{rd.cancel()}catch(e){}
-        if(!stripThink(full).trim()&&!(signal&&signal.aborted)&&(depth||0)<4&&models.length>1){if(/block|prohibit|safety|moderat|flagged|policy/i.test(pm))bad[used]=Date.now()+864e5;else busyM[used]=Date.now()+3e5;noteModel(used,false);save();toast(used.split('/').pop()+' would not answer. Trying another model.');return chatEndpoint(messages,onText,signal,(depth||0)+1)}
-        throw new Error('provider: '+pm)}const c=j.choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}}}
-  const rest=(buf+dec.decode()).trim();if(rest.startsWith('data:')){const d=rest.slice(5).trim();if(d!=='[DONE]'){try{const c=JSON.parse(d).choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}}catch(e){}}}
+      let j=null;try{j=JSON.parse(d)}catch(e){}if(!j)continue;const x=eat(j);if(x&&x.retry)return chatEndpoint(messages,onText,signal,(depth||0)+1)}}
+  const rest=(buf+(win.done?'':win.dec.decode())).trim();if(rest.startsWith('data:')){const d=rest.slice(5).trim();if(d!=='[DONE]'){try{const c=JSON.parse(d).choices?.[0]?.delta?.content;if(c){full+=c;onText&&onText(full)}}catch(e){}}}
   if(!stripThink(full).trim()&&!(signal&&signal.aborted)&&(depth||0)<2&&models.length>1){busyM[used]=Date.now()+3e5;noteModel(used,false);return chatEndpoint(messages,onText,signal,(depth||0)+1)}
   return{text:full}}
 const blobOf=u=>{const[h,b]=u.split(','),bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:(h.match(/:(.*?);/)||[])[1]||'image/jpeg'})};
