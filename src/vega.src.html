@@ -548,11 +548,14 @@ const dur=s=>{s=Math.max(0,Math.ceil(s));const h=s/3600|0,m=(s%3600)/60|0,x=s%60
 function parseDur(t){let s=0,m,any=false;const re=/(\d+(?:\.\d+)?)\s*(h|m|s)?/gi;while((m=re.exec(t))){any=true;s+=parseFloat(m[1])*({h:3600,m:60,s:1}[(m[2]||'m').toLowerCase()])}return any?Math.round(s):0}
 function splitDur(t){const m=String(t).match(/^\s*((?:\d+(?:\.\d+)?\s*(?:h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?|s(?:ec(?:ond)?s?)?)?\b\s*)+)/i);return m?{s:parseDur(m[1]),label:t.slice(m[0].length).trim()}:{s:0,label:''}}
 const stripThink=t=>t.replace(/<think>[\s\S]*?(<\/think>|$)/g,'');
+/* models write tool calls in several dialects: <<act {"tool":"x",...}>>, <<x{...}>>, <<act x {...}>>, <<tool: x {...}>>, <<{"tool":"x"}>> */
+const ACT_RE=/<<\s*(?:(?:act|tool|call)\b\s*:?\s*)?(?:([A-Za-z_][\w-]*)\s*:?\s*)?(\{[\s\S]*?\})\s*>>/g;
+const ACT_STRIP=/<<\s*(?:(?:act|tool|call)\b\s*:?\s*)?(?:[A-Za-z_][\w-]*\s*:?\s*)?\{[\s\S]*?(?:\}\s*>>|$)|<<\s*(?:act|tool|call)\b[^\n]*?(?:>>|$)/g;
 const ROBOT_END=/(?:^|\n|(?<=[.!?])\s+)(?:(?:please\s+)?(?:let me know if|feel free to (?:ask|reach)|don'?t hesitate)[^\n]*?|(?:is there )?anything else (?:i can|you(?:'d| would) like)[^\n]*?|i hope (?:this|that) helps[^\n]*?|how (?:can|may) i (?:help|assist)[^\n]*?)\s*$/i;
 function deRobot(t){let x=t.replace(/^(?:as an ai(?: language model)?,?\s*|(?:great|good|excellent) question[.!]?\s*|(?:absolutely|sure thing|of course)!\s*)/i,'');
   for(let i=0;i<2;i++){const y=x.replace(ROBOT_END,'').trimEnd();if(y.length>=3&&y!==x)x=y;else break}
   return x.includes('`')?x:x.replace(/([A-Za-z)])!+(?=\s|$)/g,'$1.')}
-const clean=t=>deRobot(stripThink(t).replace(/<<act[\s\S]*?(>>|$)/g,'').trim());
+const clean=t=>deRobot(stripThink(t).replace(ACT_STRIP,'').replace(/[ \t]+\n/g,'\n').trim());
 function md(s){
   const B=[];s=s.replace(/```[^\n]*\n?([\s\S]*?)(```|$)/g,(m,c)=>{B.push('<div class="pre"><button class="mb" data-a="code" type="button">Copy</button><pre><code>'+esc(c.replace(/\n$/,''))+'</code></pre></div>');return'\n\u0000'+(B.length-1)+'\u0000\n'});
   s=esc(s).replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/(^|[^*\w])\*([^*\n]+)\*/g,'$1<i>$2</i>')
@@ -755,7 +758,11 @@ function act(a,el){
     case'mission':{const o=String(a.objective||a.text||'').trim();if(inMission)out='A mission is already running; finish this reply normally.';else if(o){pendingMission=o;say('MISSION ▸ '+o.slice(0,70));out='Mission queued and will start right after this reply. Tell the user in one short sentence that you are starting it. Do not do the work in this reply.'}break}
   }
   save();renderOps();return out}
-const parseActs=t=>{const re=/<<act\s*(\{[\s\S]*?\})\s*>>/g,o=[];let m;while((m=re.exec(t))){try{const j=JSON.parse(m[1]);if(j&&j.tool)o.push(j)}catch(e){}}return o};
+const parseActs=t=>{const o=[];let m;ACT_RE.lastIndex=0;
+  while((m=ACT_RE.exec(t))){let j=null;try{j=JSON.parse(m[2])}catch(e){try{j=JSON.parse(m[2].replace(/'/g,'"').replace(/,\s*\}/g,'}'))}catch(e2){}}
+    if(!j||typeof j!=='object')continue;if(!j.tool&&m[1]&&!/^(act|tool|call)$/i.test(m[1]))j.tool=m[1];
+    if(j.tool){j.tool=String(j.tool).trim();o.push(j)}}
+  return o};
 
 /* ---------- abilities ---------- */
 const webOK=()=>!HOSTED&&S.web!==false;
