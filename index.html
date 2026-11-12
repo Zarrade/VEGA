@@ -555,8 +555,8 @@ async function probe(){
     const j=await r.json();let list=(j.data||j.models||[]).filter(m=>m&&(m.id||m.name));
     const isFree=m=>/:free$/.test(m.id||'')||(m.pricing&&+m.pricing.prompt===0&&+m.pricing.completion===0);
     priced=list.some(m=>m.pricing);freeSet=new Set(list.filter(isFree).map(m=>m.id));ctxMap={};list.forEach(m=>{if(m.context_length)ctxMap[m.id||m.name]=m.context_length});visionSet=new Set(list.filter(m=>m.architecture&&(m.architecture.input_modalities||[]).includes('image')&&(!priced||!S.freeOnly||isFree(m))).map(m=>m.id||m.name));
-    if(priced&&S.freeOnly){const pref=[/deepseek/,/llama/,/qwen/,/gemini|gemma/,/mistral/],rank=m=>{const i=pref.findIndex(p=>p.test(m.id));return i<0?9:i};
-      list=list.filter(isFree).filter(m=>!m.architecture||!m.architecture.output_modalities||m.architecture.output_modalities.includes('text')).sort((a,b)=>rank(a)-rank(b)||(b.context_length||0)-(a.context_length||0))}
+    if(priced&&S.freeOnly){const rank=m=>{const i=MPREF.findIndex(p=>p.test(m.id));return i<0?9:i};
+      list=list.filter(isFree).filter(chatCapable).sort((a,b)=>rank(a)-rank(b)||(b.context_length||0)-(a.context_length||0))}
     models=list.map(m=>m.id||m.name);
     lats.push(Math.round(performance.now()-t0));if(lats.length>40)lats.shift();online=true;
     const bad0=S.badModels||{};if(models.length&&(!models.includes(S.model)||bad0[S.model]>Date.now())){S.model=models.find(m=>!(bad0[m]>Date.now()))||models[0];save()}
@@ -580,14 +580,21 @@ async function chatEndpoint(messages,onText,signal,depth){
   if(priced&&S.freeOnly&&!freeSet.has(S.model))throw new Error('"'+S.model+'" is not a free model. Pick a free one in Settings.');
   const bad=S.badModels&&typeof S.badModels==='object'?S.badModels:(S.badModels={}),t0=Date.now();for(const k in bad)if(!(bad[k]>t0))delete bad[k];
   const order=[S.model,...models.filter(m=>m!==S.model&&(!priced||!S.freeOnly||freeSet.has(m)))].filter(m=>!(busyM[m]>t0)&&!(bad[m]>t0)).slice(0,6);if(S.auto!==false){const rk=rankedModels().slice(0,6);if(rk.length){order.length=0;order.push(...rk)}}
-  if(!order.length)order.push(S.model);
+  if(models.includes(ROUTER)&&!order.includes(ROUTER)){if(order.length>=6)order.length=5;order.push(ROUTER)}
+  if(!order.length){for(const k in bad)delete bad[k];for(const k in busyM)delete busyM[k];order.push(...(rankedModels().slice(0,5)));if(!order.length)order.push(S.model)}
   /* an image needs a model that can see: route to one automatically */
   const hasImg=messages.some(m=>Array.isArray(m.content)&&m.content.some(c=>c.type==='image_url'));
   if(visionSet.size&&hasImg){const vo=[...order.filter(m=>visionSet.has(m)),...[...visionSet].filter(m=>!order.includes(m))].slice(0,3);
     if(vo.length){if(vo[0]!==S.model)toast('Using '+vo[0].split('/').pop()+' to look at the image.');order.length=0;order.push(...vo)}}
   let r,used,tReq=0;
   for(let i=0;i<order.length;i++){used=order[i];tReq=performance.now();
-    r=await fetch(base()+'/chat/completions',{method:'POST',signal,headers:hdr(),body:JSON.stringify({model:used,messages,stream:true,temperature:+S.temp})});
+    const ac=new AbortController(),onAb=()=>ac.abort();if(signal){if(signal.aborted)ac.abort();else signal.addEventListener('abort',onAb,{once:true})}
+    let slow=false;const tmo=setTimeout(()=>{slow=true;ac.abort()},i===order.length-1?60000:35000);
+    try{r=await fetch(base()+'/chat/completions',{method:'POST',signal:ac.signal,headers:hdr(),body:JSON.stringify({model:used,messages,stream:true,temperature:+S.temp})})}
+    catch(e){clearTimeout(tmo);if(signal)signal.removeEventListener('abort',onAb);
+      if(slow&&!(signal&&signal.aborted)&&i<order.length-1){busyM[used]=Date.now()+3e5;noteModel(used,false);toast(used.split('/').pop()+' is slow to answer. Trying '+order[i+1].split('/').pop()+'.');continue}
+      throw slow?new Error('The free models are all slow to answer right now.'):e}
+    clearTimeout(tmo);if(signal)signal.removeEventListener('abort',onAb);
     if(r.ok)break;
     let why='';try{why=await r.clone().text()}catch(e){}
     const ours=/Only free models are allowed|no OpenRouter key|Too many requests\. Wait|only answers the VEGA deck/.test(why);
@@ -870,6 +877,7 @@ function fail(e){
   else{const raw=String(e&&e.message||''),k=raw.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)/),why=k?k[1].replace(/\\(.)/g,'$1'):'';
     if(/^provider: /.test(raw))m=`The models I tried would not answer that one. The last said: “${raw.slice(10,230)}”\n\nPress Retry and I will route it to a different model.`;
     else if(/^HTTP \d+/.test(raw)&&why)m=`None of the available models would take that request. The last one answered: “${why.slice(0,220)}”\n\nPress Retry, or pick a different model in **Settings**.`;
+    else if(/all slow to answer/.test(raw))m='The free models are all busy or slow right now. Press Retry in a moment and I will try again.';
     else if(!navigator.onLine)m='This device is offline, so I cannot reach a model. Timers, the Library and calculations still work.';
     else if(S.relay||/openrouter\.ai/.test(S.url||''))m=`I could not reach the model service (${raw.slice(0,160)||'network error'}). It is usually brief. Press Retry in a moment.`;
     else m=`The model request did not go through: ${raw||'network error'}\n\nCheck that the server is running, the model is loaded, and that it accepts requests from this page's origin (CORS).`;probe()}
@@ -1455,12 +1463,20 @@ function bgUI(){const b=$('#bgbtn');if(!b)return;$('#app-l').hidden=HOSTED;b.tex
 addEventListener('focus',()=>pullInbox());
 
 /* ---------- engine selection that learns ---------- */
+/* strongest first; anything unknown sits in the middle; tiny models only as a last resort */
+var MPREF=[/deepseek|qwen3|llama-4|gemini|gemma-4-31|nemotron-3-ultra|kimi|glm|gpt-oss/,/nemotron-3\.5-super|ernie|gemma|llama|qwen|mistral|grok|hermes/,/nemotron|dots|flint|north|phi/];
+const TINY=/\b(lfm|1\.\db|2\.\db|3b|nano|lightning|mini|small)\b|lfm-/i, ROUTER='openrouter/free';
+function chatCapable(m){const id=m.id||m.name||'',a=m.architecture||{},out=a.output_modalities;
+  if(/lyria|music|tts|whisper|embed|image-gen|imagen|flux|sdxl|veo|sora/i.test(id))return false;
+  if(/inkling/i.test(id))return false;                       /* refuses anything but approved agent harnesses */
+  if(out&&(!out.includes('text')||out.some(o=>o==='audio'||o==='image'&&out.length===1)))return false;
+  return true}
 const mstat=m=>(S.mstats&&S.mstats[m])||{ok:0,fail:0,ms:0};
 function noteModel(m,ok,ms){if(!m)return;const st=S.mstats&&typeof S.mstats==='object'?S.mstats:(S.mstats={}),x=st[m]||(st[m]={ok:0,fail:0,ms:0});
   if(ok){x.ok++;if(ms>0)x.ms=x.ms?Math.round(x.ms*.7+ms*.3):Math.round(ms)}else x.fail++;if(x.ok+x.fail>60){x.ok=Math.round(x.ok/2);x.fail=Math.round(x.fail/2)}
   const ks=Object.keys(st);if(ks.length>80)delete st[ks[0]]}
-function rankedModels(){const now=Date.now(),bad=S.badModels||{},pref=[/deepseek/,/llama/,/qwen/,/gemini|gemma/,/mistral/,/gpt|grok|phi|glm|kimi|hermes/];
-  const score=m=>{const x=mstat(m),n=x.ok+x.fail,rate=(x.ok+1.2)/(n+2),pi=pref.findIndex(p=>p.test(m));return rate*100-(x.ms?Math.min(x.ms,8000)/400:5)-(pi<0?6:pi)+Math.min((ctxMap[m]||0)/100000,3)};
+function rankedModels(){const now=Date.now(),bad=S.badModels||{},pref=MPREF;
+  const score=m=>{const x=mstat(m),n=x.ok+x.fail,rate=(x.ok+1.2)/(n+2),pi=pref.findIndex(p=>p.test(m));return rate*100-(x.ms?Math.min(x.ms,8000)/400:5)-(pi<0?2:pi)*6+Math.min((ctxMap[m]||0)/100000,3)-(TINY.test(m)?40:0)-(m===ROUTER?25:0)};
   return models.filter(m=>(!priced||!S.freeOnly||freeSet.has(m))&&!(bad[m]>now)&&!(busyM[m]>now)).sort((a,b)=>score(b)-score(a))}
 
 /* ---------- diagnostics ---------- */

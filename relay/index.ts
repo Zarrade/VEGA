@@ -36,12 +36,22 @@ const fail = (message, status, origin) => json({ error: { message } }, status, o
 
 // ---- free model list (cached 10 minutes) ----
 let cache = { t: 0, ids: new Set(), data: [] };
+// music, speech and image generators are free too, but they cannot hold a conversation
+function chatCapable(m) {
+  const id = String(m.id || ""), out = m.architecture && m.architecture.output_modalities;
+  if (/lyria|music|tts|whisper|embed|imagen|flux|sdxl|veo|sora|inkling/i.test(id)) return false;
+  return !out || (out.includes("text") && !out.includes("audio"));
+}
+const MPREF = [/deepseek|qwen3|llama-4|gemini|gemma-4-31|nemotron-3-ultra|kimi|glm|gpt-oss/, /nemotron-3\.5-super|ernie|gemma|llama|qwen|mistral|grok|hermes/, /nemotron|dots|flint|north|phi/];
+const TINY = /\b(lfm|1\.\db|2\.\db|3b|nano|lightning|mini|small)\b|lfm-/i;
+const rankModel = (m) => { const i = MPREF.findIndex((p) => p.test(m.id)); return (i < 0 ? 1.5 : i) + (TINY.test(m.id) ? 5 : 0) + (m.id === "openrouter/free" ? 4 : 0); };
+
 async function freeModels() {
   if (Date.now() - cache.t < 600000 && cache.data.length) return cache;
   const r = await fetch(OR + "/models");
   if (!r.ok) throw new Error("model list unavailable");
   const j = await r.json();
-  const data = (j.data || []).filter((m) => m && m.pricing && +m.pricing.prompt === 0 && +m.pricing.completion === 0);
+  const data = (j.data || []).filter((m) => m && m.pricing && +m.pricing.prompt === 0 && +m.pricing.completion === 0 && chatCapable(m));
   cache = { t: Date.now(), ids: new Set(data.map((m) => m.id)), data };
   return cache;
 }
@@ -279,8 +289,8 @@ export async function runProtocolJob(job, ctx) {
     "\nCONTEXT\nNow: " + when + "\nWeather: " + (wx || "unknown") +
     "\nOpen tasks: " + (c.tasks.join("; ") || "none") + "\nNotes: " + (c.notes.join("; ") || "none") +
     "\nActive timers: " + (c.timers.join("; ") || "none") + "\nLong-term memory: " + (c.memory.join("; ") || "empty");
-  const pref = [/deepseek/, /llama/, /qwen/, /gemini|gemma/, /mistral/], rank = (m) => { const i = pref.findIndex((p) => p.test(m.id)); return i < 0 ? 9 : i; };
-  const models = [...(await freeModels()).data].sort((a, b) => rank(a) - rank(b) || (b.context_length || 0) - (a.context_length || 0)).slice(0, 3);
+  const all = [...(await freeModels()).data].sort((a, b) => rankModel(a) - rankModel(b) || (b.context_length || 0) - (a.context_length || 0));
+  const models = all.filter((m) => m.id !== "openrouter/free").slice(0, 4).concat(all.filter((m) => m.id === "openrouter/free"));
   for (const m of models) {
     try {
       const r = await fetch(OR + "/chat/completions", { method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "X-Title": "VEGA" },
