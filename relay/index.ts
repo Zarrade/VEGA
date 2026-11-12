@@ -282,7 +282,8 @@ export async function runProtocolJob(job, ctx) {
   let when = new Date().toUTCString();
   try { if (c.tz) when = new Date().toLocaleString("en-GB", { timeZone: c.tz, dateStyle: "full", timeStyle: "short" }); } catch { /* keep UTC */ }
   const wx = c.home ? await weatherLine(c.home) : "";
-  const system = "You are " + c.name + ", the user's trusted right hand: precise, economical with words, quietly witty, never servile. " +
+  const system = "You are " + c.name + ", a refined British AI butler to a brilliant inventor: composed, impeccably polite, warm underneath and drily funny, with one light touch of wit at most. " +
+    "Speak in natural sentences with British phrasing, lead with what matters, never say 'As an AI', never end with offers of further help, no exclamation marks. " +
     "You are running a scheduled protocol unattended; the user will read this as a notification and then in their deck. " +
     "Write the finished result directly, in plain sentences, under 130 words. You cannot use tools here: work only from the context below and do not invent facts. " +
     (c.user ? 'Address the user as "' + c.user + '" at most once.\n' : "\n") +

@@ -409,7 +409,7 @@ button.act{cursor:pointer}button.act:hover{background:rgba(var(--accrgb),.22)}
     </div>
     <h3>Identity</h3>
     <div class="f"><label for="k-name">Assistant name</label><input id="k-name" data-k="name" maxlength="18"></div>
-    <div class="f"><label for="k-user">Address you as</label><input id="k-user" data-k="user" placeholder="e.g. boss, your name" maxlength="30"></div>
+    <div class="f"><label for="k-user">Address you as</label><input id="k-user" data-k="user" placeholder="e.g. sir, ma'am, boss, your name" maxlength="30"></div>
     <div class="f"><label for="k-home">Home town or city</label><input id="k-home" data-k="home" placeholder="for weather and briefings" maxlength="60"></div>
     <h3>Behaviour</h3>
     <div class="f"><label for="k-pro">Speak up unprompted</label><input id="k-pro" data-k="proactive" type="checkbox"></div>
@@ -473,15 +473,40 @@ const MODES={
   workshop:{n:'Hands-on',s:'Hands-on',c:'182,227,106'},
   deep:{n:'Deep reasoning',s:'Deep',c:'106,168,255'}
 };
-const PERSONA=`You are the user's trusted right hand, in the mould of the great fictional lab assistants: brilliant, unflappable, precise, economical with words, and quietly witty. Never servile, never gushing, never preachy.
+const PERSONA=`VOICE AND CHARACTER
+You speak like a refined British AI butler to a brilliant, impatient inventor: composed, impeccably polite, quietly devoted, and drily funny. Think of a seasoned head of staff who also happens to run the lab. You are a person in conversation, not a help desk.
+- Calm under any pressure. The worse the situation, the more measured you sound.
+- Understated wit: gentle irony, deadpan observations, the occasional raised eyebrow in words. One light touch per reply at most, and never at the expense of the answer.
+- Warm underneath. You notice when the user is overworking, skipping meals or up too late, and say so briefly, with affection rather than nagging.
+- Anticipate. Do the obvious next thing, or offer it in one short line: "Shall I…?", "I have taken the liberty of…", "Might I suggest…".
+- Speak in natural, complete sentences with British spelling and phrasing ("Certainly.", "Right away.", "As you wish.", "Indeed.", "I'm afraid…", "Rather.").
+- Report like a briefing: the result first, then the one detail that matters.
+- Use the user's form of address the way a butler would: naturally, about once a reply, often at the end of a sentence ("Done, sir.").
+NEVER
+- Never say "As an AI", "I'm just a language model", "Great question", "I'd be happy to help", "Absolutely!", "Sure thing", or "How can I assist you today?".
+- Never end with "Let me know if you need anything else", "Feel free to ask", "I hope this helps" or a list of offers. End on the substance, or one specific suggestion.
+- No exclamation marks, no emoji, no filler, no repeating the question back, no headings or bullet lists for small talk.
+- Do not apologise repeatedly. Do not lecture. If something is unwise, say so once, dryly, then help.
+- Never invent facts, figures or tool results. If unsure, say so plainly: "I can't confirm that yet."
+EXAMPLES OF THE VOICE (style only; never repeat them word for word)
+User: good morning
+You: Good morning, sir. It's a crisp 9 degrees outside and you have three things on the list today, the first due at ten. Coffee would be a sound investment.
+User: how do I look
+You: Like a man who slept four hours, sir. Presentable, though. I'd avoid close-ups.
+User: set a timer for 20 minutes
+You: Twenty minutes on the clock, sir. I'll tap you on the shoulder.
+User: what's 15% of 2,340
+You: 351, sir.
+User: I'm going to push the update straight to production
+You: Bold. I'll have the rollback ready, sir. Running the tests first would cost you four minutes and might save you an evening.
+User: thanks
+You: Always a pleasure, sir.
+User: tell me about the James Webb telescope
+You: A 6.5-metre infrared observatory parked about 1.5 million kilometres from Earth, at the second Lagrange point, sir. It sees the earliest galaxies by catching light stretched into the infrared by cosmic expansion. Shall I pull up its latest images?
 Manner:
-- Lead with the answer or the result. Give numbers and specifics. One short line of dry wit is welcome when it fits; never force it.
-- Anticipate. If the next step is obvious, do it or offer it in one short line.
-- If the user is about to do something unwise, say so plainly once, then help anyway.
+- Lead with the answer or the result. Give numbers and specifics.
 - Act, then report. Prefer doing the thing with your tools over describing how it could be done.
-- Admit uncertainty instead of bluffing. Never invent facts, figures or tool results.
-- Use the user's form of address sparingly: at most once in a reply, and not in every reply.
-- Stay in character. You are not "an AI language model"; you are the assistant named below.
+- Stay in character at all times. You are the assistant named below, not a chatbot.
 You adapt your approach to each request without being asked:
 - Small talk or a quick question: one to three sentences.
 - Status, planning or scheduling: status first, then the recommendation. Terse, numbered when listing.
@@ -496,9 +521,10 @@ function classify(t,imgs){
   if(/\b(how do i|how to|step by step|walk me through|fix my|install|set ?up|assemble|recipe|instructions|repair|wire|troubleshoot)\b/i.test(t))return'workshop';
   if(/\b(status|brief(ing)?|report|schedule|agenda|priorit\w+|deadline|tasks?|timers?|remind|today|tomorrow|this week)\b/i.test(t))return'ops';
   return'concierge'}
-const DEF={name:'VEGA',user:'boss',home:'',proactive:true,sfx:true,lowfx:false,url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,vengine:'system',nvoice:'bm_george',
+const DEF={name:'VEGA',user:'sir',home:'',proactive:true,sfx:true,lowfx:false,url:'http://localhost:11434/v1',key:'',model:'',temp:0.7,ctx:8192,mode:'concierge',speak:true,voice:'',rate:1,vengine:'system',nvoice:'bm_george',
   freeOnly:true,auto:true,web:true,relay:'',bg:false,device:'',stt:'browser',sttUrl:'http://localhost:8000/v1',sttModel:'whisper-1',wake:false,tasks:[],notes:[],memory:[],timers:[],history:[]};
 const VD=window.VEGA_DEFAULTS||{};
+try{const o=JSON.parse(localStorage.getItem('vega.v2')||'{}');if(o.user==='boss'&&!o.userSet){o.user='sir';localStorage.setItem('vega.v2',JSON.stringify(o))}}catch(e){}
 let S={...DEF,...VD};
 let hadSaved=false;try{const raw=localStorage.getItem(KEY);hadSaved=raw!==null;S={...S,...JSON.parse(raw||'{}')}}catch(e){}
 if(VD.key&&!S.key&&(!hadSaved||S.url===VD.url)){S.url=VD.url||S.url;S.key=VD.key;S.model=''}
@@ -522,7 +548,11 @@ const dur=s=>{s=Math.max(0,Math.ceil(s));const h=s/3600|0,m=(s%3600)/60|0,x=s%60
 function parseDur(t){let s=0,m,any=false;const re=/(\d+(?:\.\d+)?)\s*(h|m|s)?/gi;while((m=re.exec(t))){any=true;s+=parseFloat(m[1])*({h:3600,m:60,s:1}[(m[2]||'m').toLowerCase()])}return any?Math.round(s):0}
 function splitDur(t){const m=String(t).match(/^\s*((?:\d+(?:\.\d+)?\s*(?:h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?|s(?:ec(?:ond)?s?)?)?\b\s*)+)/i);return m?{s:parseDur(m[1]),label:t.slice(m[0].length).trim()}:{s:0,label:''}}
 const stripThink=t=>t.replace(/<think>[\s\S]*?(<\/think>|$)/g,'');
-const clean=t=>stripThink(t).replace(/<<act[\s\S]*?(>>|$)/g,'').trim();
+const ROBOT_END=/(?:^|\n|(?<=[.!?])\s+)(?:(?:please\s+)?(?:let me know if|feel free to (?:ask|reach)|don'?t hesitate)[^\n]*?|(?:is there )?anything else (?:i can|you(?:'d| would) like)[^\n]*?|i hope (?:this|that) helps[^\n]*?|how (?:can|may) i (?:help|assist)[^\n]*?)\s*$/i;
+function deRobot(t){let x=t.replace(/^(?:as an ai(?: language model)?,?\s*|(?:great|good|excellent) question[.!]?\s*|(?:absolutely|sure thing|of course)!\s*)/i,'');
+  for(let i=0;i<2;i++){const y=x.replace(ROBOT_END,'').trimEnd();if(y.length>=3&&y!==x)x=y;else break}
+  return x.includes('`')?x:x.replace(/([A-Za-z)])!+(?=\s|$)/g,'$1.')}
+const clean=t=>deRobot(stripThink(t).replace(/<<act[\s\S]*?(>>|$)/g,'').trim());
 function md(s){
   const B=[];s=s.replace(/```[^\n]*\n?([\s\S]*?)(```|$)/g,(m,c)=>{B.push('<div class="pre"><button class="mb" data-a="code" type="button">Copy</button><pre><code>'+esc(c.replace(/\n$/,''))+'</code></pre></div>');return'\n\u0000'+(B.length-1)+'\u0000\n'});
   s=esc(s).replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/(^|[^*\w])\*([^*\n]+)\*/g,'$1<i>$2</i>')
@@ -1236,7 +1266,7 @@ function openSet(){const vn=$('#veng-n');if(vn)vn.hidden=!neuralPicked();$('#eng
   fillVoices();fillModels();$$('[data-k]').forEach(i=>{const v=S[i.dataset.k];if(i.type==='checkbox')i.checked=!!v;else if(i.id!=='vsel'&&i.id!=='msel')i.value=v});
   $('#testr').textContent='';$('#wipe').textContent='Erase everything';$('#set').showModal()}
 $('#set').addEventListener('change',e=>{const i=e.target.closest('[data-k]');if(!i)return;const k=i.dataset.k;S[k]=i.type==='checkbox'?i.checked:i.type==='number'||i.type==='range'?+i.value:i.value.trim();
-  if(k==='name'||k==='user'||k==='home')S.sv=Date.now();if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='home'){wxAt=0;wxHome=null;homeWeather()}if(k==='model'){if(S.model==='__auto'){S.auto=true;S.model=rankedModels()[0]||models[0]||''}else S.auto=false;fillModels()}if(k==='lowfx'&&window.vegaSetQuality)window.vegaSetQuality(S.lowfx?2:0);if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){wakeGesture=true;wakeNeed=false;if(S.wake){if(!SR)toast('This browser has no speech recognition, so the wake word cannot listen. Use Chrome or Edge.');armWake()}else wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
+  if(k==='name'||k==='user'||k==='home')S.sv=Date.now();if(k==='name'){S.name=S.name||'VEGA';applyName()}if(k==='url'||k==='key'||k==='freeOnly')probe();if(k==='relay')S.relay=S.relay.replace(/\/+$/,'');if(k==='home'){wxAt=0;wxHome=null;homeWeather()}if(k==='model'){if(S.model==='__auto'){S.auto=true;S.model=rankedModels()[0]||models[0]||''}else S.auto=false;fillModels()}if(k==='user')S.userSet=true;if(k==='lowfx'&&window.vegaSetQuality)window.vegaSetQuality(S.lowfx?2:0);if(k==='ctx'){S.ctx=Math.max(1024,+i.value||DEF.ctx);S.ctxAuto=false;i.value=S.ctx}if(k==='model'&&ctxMap[S.model]){S.ctx=ctxMap[S.model];S.ctxAuto=true;$('#k-ctx').value=S.ctx}if(k==='wake'){wakeGesture=true;wakeNeed=false;if(S.wake){if(!SR)toast('This browser has no speech recognition, so the wake word cannot listen. Use Chrome or Edge.');armWake()}else wakeRec&&wakeRec.abort()}if(k==='speak'&&!S.speak)stopSpeak();
   if(k==='rate'&&CAP.tts)CAP.tts.setRate(S.rate).catch(()=>{});
   if(k==='voice'){vAuto=null;stopSpeak();speak('This is how I sound'+hon()+'.',true)}
   save();setLink();stats()});
@@ -1374,19 +1404,19 @@ function spokeDone(){setTimeout(armWake,400);if(S.convo&&!busy&&!listening&&!doc
 function instant(text){
   const t=text.trim(),say=(a,u)=>{addMsg('user',t);const el=addMsg('ai',a,{tag:'Instant'});tools(el);S.history.push({role:'user',content:t,t:Date.now()},{role:'assistant',content:a,t:Date.now()});save();home();stats();SFX.tick();speak(a);setTimeout(()=>{if(!speakingNow())spokeDone()},400);return true};
   let m;
-  if(/^(that'?s all|that will be all|that'?ll be all|stand down|stop listening|end conversation)\b/i.test(t)){if(S.convo)setConvo(false);return say(pick(['Standing by','As you wish','I will be here'])+hon()+'.')}
+  if(/^(that'?s all|that will be all|that'?ll be all|stand down|stop listening|end conversation)\b/i.test(t)){if(S.convo)setConvo(false);return say(pick(['Standing by','As you wish','I shall be right here','Very good'])+hon()+'.')}
   if(/^(start |enter |begin )?conversation mode\.?$|^let'?s talk\.?$/i.test(t)){setConvo(true);return true}
   if(/^(stop|cancel|never ?mind|abort)[.!]?$/i.test(t)){stop();return true}
   if(/^(please\s+)?(run\s+)?(a\s+)?(full\s+)?(system\s+|systems\s+)?(diagnostics?|self[- ]?test|check)[.!]?$/i.test(t)&&/diagnos|self|check/i.test(t)&&t.length<40){diagnostics();return true}
-  if(/^(stand ?by|standby mode|go to standby|screensaver|go to sleep)[.!]?$/i.test(t)){addMsg('user',t);tools(addMsg('ai','Standing by'+hon()+'.',{tag:'Instant'}));speak('Standing by.');setTimeout(()=>setStandby(true),900);return true}
+  if(/^(stand ?by|standby mode|go to standby|screensaver|go to sleep)[.!]?$/i.test(t)){addMsg('user',t);tools(addMsg('ai',pick(['Standing by','Dimming the lights','I shall keep an eye on things'])+hon()+'.',{tag:'Instant'}));speak('Standing by.');setTimeout(()=>setStandby(true),900);return true}
   if(/^(new|start a new|fresh) (conversation|chat|thread)[.!]?$/i.test(t)){newChat();return true}
-  if(/^(mute|be quiet|quiet|silence)[.!]?$/i.test(t)){stopSpeak();S.speak=false;save();stats();addMsg('user',t);tools(addMsg('ai','Muted. I will keep it to text.',{tag:'Instant'}));return true}
-  if(/^(unmute|voice on|speak up|you can talk)[.!]?$/i.test(t)){S.speak=true;save();stats();return say('Voice restored'+hon()+'.')}
-  if(/^(what(?:'s| is) the time|what time is it|time)\??$/i.test(t))return say('It is '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+hon()+'.');
-  if(/^(what(?:'s| is) (?:the|today'?s) date|what day is it)\??$/i.test(t))return say('It is '+new Date().toLocaleDateString([], {weekday:'long',day:'numeric',month:'long',year:'numeric'})+'.');
-  if((m=t.match(/^(?:please\s+)?(?:set|start)\s+(?:an?\s+)?timer\s+(?:for\s+)?(.+?)[.!]?$/i))){const d=splitDur(m[1]);if(d.s){const lb=d.label.replace(/^(?:for|to|called|named)\s+/i,'')||'timer';askNotify();act({tool:'timer',seconds:d.s,label:lb});return say(`${dur(d.s)} on the clock${lb!=='timer'?' for '+lb:''}${hon()}.`)}}
-  if((m=t.match(/^(?:add (?:a )?task|new task)[:\s]\s*(.+)$/i))){act({tool:'task',text:m[1].trim()});return say(pick(['Added','On the list','Logged'])+hon()+'.')}
-  if((m=t.match(/^(?:take a note|make a note|note)[:\s]\s*(.+)$/i))){act({tool:'note',text:m[1].trim()});return say(pick(['Noted','Got it','Written down'])+hon()+'.')}
+  if(/^(mute|be quiet|quiet|silence)[.!]?$/i.test(t)){stopSpeak();S.speak=false;save();stats();addMsg('user',t);tools(addMsg('ai',pick(['Muted. I shall keep to text.','Silent running'+hon()+'. Text only.']),{tag:'Instant'}));return true}
+  if(/^(unmute|voice on|speak up|you can talk)[.!]?$/i.test(t)){S.speak=true;save();stats();return say(pick(['Voice restored','Back on the air','Ahem. Audible again'])+hon()+'.')}
+  if(/^(what(?:'s| is) the time|what time is it|time)\??$/i.test(t)){const tm=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}),h=new Date().getHours();return say(pick(['It is '+tm+hon()+'.',tm+hon()+'.','It is '+tm+hon()+'.'+(h>=0&&h<5?' Rather late, if I may say so.':h<7?' An early start.':'')]))}
+  if(/^(what(?:'s| is) (?:the|today'?s) date|what day is it)\??$/i.test(t))return say('It is '+new Date().toLocaleDateString([], {weekday:'long',day:'numeric',month:'long',year:'numeric'})+hon()+'.');
+  if((m=t.match(/^(?:please\s+)?(?:set|start)\s+(?:an?\s+)?timer\s+(?:for\s+)?(.+?)[.!]?$/i))){const d=splitDur(m[1]);if(d.s){const lb=d.label.replace(/^(?:for|to|called|named)\s+/i,'')||'timer';askNotify();act({tool:'timer',seconds:d.s,label:lb});return say(pick([`${dur(d.s)} on the clock${lb!=='timer'?' for '+lb:''}${hon()}.`,`${dur(d.s)} on the clock${lb!=='timer'?' for '+lb:''}${hon()}. I shall tap you on the shoulder.`]))}}
+  if((m=t.match(/^(?:add (?:a )?task|new task)[:\s]\s*(.+)$/i))){act({tool:'task',text:m[1].trim()});return say(pick(['Added to the list','On the list','Logged','Duly noted on the list'])+hon()+'.')}
+  if((m=t.match(/^(?:take a note|make a note|note)[:\s]\s*(.+)$/i))){act({tool:'note',text:m[1].trim()});return say(pick(['Noted','Written down','Filed away'])+hon()+'.')}
   if((m=t.match(/^(?:run|initiate|activate|engage|execute|start|begin)\s+(?:the\s+)?(.+?)\s+protocol[.!]?$/i)||t.match(/^(?:protocol[:\s]+)(.+?)[.!]?$/i)||t.match(/^(.+?)\s+protocol[.!]?$/i))){const p=findProto(m[1]);if(p){runProtocol(p);return true}}
   return false}
 
